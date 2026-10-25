@@ -1,0 +1,4 @@
+{
+  "laugh": {"subtitle": "subtitles.naiwa.laugh", "sounds": [{"name": "naiwa:laugh_full", "attenuation_distance": 16, "preload": true}]},
+  "shield_laugh": {"subtitle": "subtitles.naiwa.laugh", "sounds": [{"name": "naiwa:laugh_short", "attenuation_distance": 16}]}
+}

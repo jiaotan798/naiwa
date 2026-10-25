@@ -1,0 +1,92 @@
+{
+  "version": "0.4.4",
+  "date": "2026-10-25",
+  "meaning": "当前上传范围内素材的文件识别与一致性证据",
+  "files": [
+    {
+      "path": "assets/runtime/assets/naiwa/models/entity/naiwa.nwm",
+      "bytes": 2405212,
+      "sha256": "e92b61a34e0af2ae09fa0402b35b02e797b4195879105225e2ef675d5d0c70d6"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_0.png",
+      "bytes": 2009169,
+      "sha256": "42df551d598c2ad9211e8aef5258c49bc97aa4295614d4f8d4701ade64c57493"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_1.png",
+      "bytes": 4306,
+      "sha256": "2ab58b933d2fe40d3267144bfd258c03f8704fde7745259d9fb6ae42b09ef6d1"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_2.png",
+      "bytes": 75254,
+      "sha256": "862ca68d2048daf2e9416f31503fa00ed72f2214a62d89d1cf4f28705d200756"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_3.png",
+      "bytes": 56024,
+      "sha256": "0aaa3d575e498575d58e9e6bec5385441c289b5f7e3b7868cc3da1e494a71dc3"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_4.png",
+      "bytes": 1913123,
+      "sha256": "da0c3265f48b7dac28f7c6904f20821afba2b20bceaeac68d9784846cbaf1276"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_5.png",
+      "bytes": 102,
+      "sha256": "f4e3cc68d8d9652c1561c0327e2735d1dc07b58a9f05a1927298fb9f6a2ab042"
+    },
+    {
+      "path": "assets/shield/naiwa-shield-v1.png",
+      "bytes": 425801,
+      "sha256": "d7eef39dab1048d7c1891ea34f6f2d7ac891cbd44179e80155754d91571dacb3"
+    },
+    {
+      "path": "assets/source/nailong_origin_zero.bbmodel",
+      "bytes": 7421595,
+      "sha256": "5893f524bacf8d99d9e468d7f141489c010a35ca670fb81ece3a64373f2caf9d"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/sounds/laugh_full.ogg",
+      "bytes": 45861,
+      "sha256": "f57870ddfaed8280acdd85154e57b17184199ecd5fbded7a3489a9ce96cc73b1"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/sounds/laugh_short.ogg",
+      "bytes": 18190,
+      "sha256": "ef885d3cbf626c1b533adcd7bcb5fa5811306b7a26b98aa49734a7068720086e"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/textures/effect/ascension_beam.png",
+      "bytes": 9226,
+      "sha256": "ab3796a9a786401687bf2a1ec7513a651540e167f3dd56c0a704a8440f41ac39"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/textures/entity/naiwa_shield.png",
+      "bytes": 425801,
+      "sha256": "d7eef39dab1048d7c1891ea34f6f2d7ac891cbd44179e80155754d91571dacb3"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/textures/item/laugh_gas_bottle.png",
+      "bytes": 171,
+      "sha256": "a64308662669933a93d5d10f5d246c810c312ec5553582b079707c0cd7c3884c"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/textures/item/naiwa_totem.png",
+      "bytes": 167,
+      "sha256": "c241ab9cb90cf71f0faab4284d28064dad65caaeacc1dcaaa3741b145446a5cd"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/textures/mob_effect/ascending.png",
+      "bytes": 167,
+      "sha256": "c241ab9cb90cf71f0faab4284d28064dad65caaeacc1dcaaa3741b145446a5cd"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/textures/mob_effect/laughing.png",
+      "bytes": 167,
+      "sha256": "c241ab9cb90cf71f0faab4284d28064dad65caaeacc1dcaaa3741b145446a5cd"
+    }
+  ]
+}

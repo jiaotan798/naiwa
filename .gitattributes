@@ -1,0 +1,16 @@
+* text=auto eol=lf
+**/gradlew text eol=lf
+**/gradlew.bat text eol=crlf
+*.png binary
+*.jpeg binary
+*.jpg binary
+*.ogg binary
+*.mp4 binary
+*.wav binary
+*.nbt binary
+*.nwm binary
+*.jar binary
+# 源模型及校验产物按原字节保存，避免克隆后的换行转换破坏来源摘要。
+*.bbmodel -text
+assets/runtime/** -text
+validation/*-gametest.txt -text

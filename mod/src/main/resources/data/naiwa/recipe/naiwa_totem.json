@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [{"item": "minecraft:totem_of_undying"}, {"item": "naiwa:laugh_gas_bottle"}],
+  "result": {"id": "naiwa:naiwa_totem", "count": 1}
+}

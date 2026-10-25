@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="All Rights Reserved"
+[[mods]]
+modId="naiwa"
+version="${version}"
+displayName="奶蛙"
+description='''
+奶蛙来了，你的生存日常多了一位爱整蛊的伙伴。
+
+挖矿时，身后有人敲方块；钓鱼时，奶蛙捧着附魔书抢走渔获；刚挖出的钻石还会自己跑。箱中探头、望远镜贴脸、门后变脸等十种整蛊，等你遇见它。
+
+趁奶蛙捧腹大笑，用玻璃瓶收集笑气。投掷笑气瓶能让普通怪物暂时笑到停手；与不死图腾合成奶蛙图腾，还能在危急时保命、变身奶蛙并腾空飞升。
+
+让奶蛙把普通盾牌变成奶蛙盾，累计三次成功格挡后，就会探头大笑并击退周围生物。
+
+支持单人和联机，和平难度也能触发。整蛊间隔、同种连续触发、死亡复活和图腾落地后的出场距离均可在模组设置中调整。钻石整蛊会在奶蛙退场后原数交还本次掉落。
+
+适用 Minecraft Java 1.21.1 / NeoForge 21.1.252 / Java 21。联机时客户端和服务器均需安装，无需 YSM 或额外动画前置。
+'''
+[[mixins]]
+config="naiwa.mixins.json"
+[[dependencies.naiwa]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.252,)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.naiwa]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="BOTH"

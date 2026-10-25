@@ -1,0 +1,48 @@
+# 构建缓存、成品与开发游戏数据由本机生成。
+.gradle/
+build/
+bin/
+out/
+/mod/run*/
+logs/
+crash-reports/
+*.log
+/.bake-work/
+/.verification/
+# 共享工具、运行时及 agent/MCP 本机配置不属于模组源码。
+/tools/
+/.runtime/
+/.cache/
+/node_modules/
+/.codex/
+/.agents/
+
+# 编辑器与本地认证文件不提交。
+.idea/
+.vscode/
+.eclipse/
+.settings/
+.serena/
+.classpath
+.project
+*.iml
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 发布成品单独放入 Releases，Wrapper JAR 必须保留才能独立构建。
+*.jar
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# 本次只交付当前开发源，参考媒体、提示词与历史素材不纳入上传快照。
+/assets/reference/
+/assets/source/history/
+/assets/shield/vanilla-shield-uv-reference.png
+*.prompt.*
+/scripts/make-laugh-audio.ps1

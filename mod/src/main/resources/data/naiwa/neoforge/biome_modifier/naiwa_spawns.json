@@ -1,0 +1,5 @@
+{
+  "type": "neoforge:add_spawns",
+  "biomes": ["minecraft:plains", "minecraft:sunflower_plains", "minecraft:forest", "minecraft:birch_forest", "minecraft:swamp"],
+  "spawners": {"type": "naiwa:naiwa", "weight": 2, "minCount": 1, "maxCount": 1}
+}

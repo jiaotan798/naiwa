@@ -1,0 +1,85 @@
+{
+  "sourceSha256": "5893f524bacf8d99d9e468d7f141489c010a35ca670fb81ece3a64373f2caf9d",
+  "fps": 50,
+  "bones": 38,
+  "vertices": 3580,
+  "triangles": 6997,
+  "clips": [
+    {
+      "name": "idle",
+      "length": 2.4,
+      "loop": true,
+      "frameCount": 121
+    },
+    {
+      "name": "walk",
+      "length": 1.2,
+      "loop": true,
+      "frameCount": 61
+    },
+    {
+      "name": "run",
+      "length": 0.8,
+      "loop": true,
+      "frameCount": 41
+    },
+    {
+      "name": "jump",
+      "length": 1.6,
+      "loop": false,
+      "frameCount": 81
+    },
+    {
+      "name": "wave",
+      "length": 2.4,
+      "loop": false,
+      "frameCount": 121
+    },
+    {
+      "name": "laugh_enter",
+      "length": 0.6,
+      "loop": false,
+      "frameCount": 31
+    },
+    {
+      "name": "laugh",
+      "length": 7.04,
+      "loop": false,
+      "frameCount": 353
+    },
+    {
+      "name": "laugh_exit",
+      "length": 0.8,
+      "loop": false,
+      "frameCount": 41
+    },
+    {
+      "name": "ascend_enter",
+      "length": 0.6,
+      "loop": false,
+      "frameCount": 31
+    },
+    {
+      "name": "ascend_hover",
+      "length": 3,
+      "loop": true,
+      "frameCount": 151
+    },
+    {
+      "name": "ascend_exit",
+      "length": 0.6,
+      "loop": false,
+      "frameCount": 31
+    }
+  ],
+  "files": {
+    "assets/naiwa/textures/entity/naiwa_0.png": "42df551d598c2ad9211e8aef5258c49bc97aa4295614d4f8d4701ade64c57493",
+    "assets/naiwa/textures/entity/naiwa_1.png": "2ab58b933d2fe40d3267144bfd258c03f8704fde7745259d9fb6ae42b09ef6d1",
+    "assets/naiwa/textures/entity/naiwa_2.png": "862ca68d2048daf2e9416f31503fa00ed72f2214a62d89d1cf4f28705d200756",
+    "assets/naiwa/textures/entity/naiwa_3.png": "0aaa3d575e498575d58e9e6bec5385441c289b5f7e3b7868cc3da1e494a71dc3",
+    "assets/naiwa/textures/entity/naiwa_4.png": "da0c3265f48b7dac28f7c6904f20821afba2b20bceaeac68d9784846cbaf1276",
+    "assets/naiwa/textures/entity/naiwa_5.png": "f4e3cc68d8d9652c1561c0327e2735d1dc07b58a9f05a1927298fb9f6a2ab042",
+    "native-pose-checks.json": "00eb02b6a67925cc1607695c7e5430e0dba0308e214c83b7781789f982e5093c",
+    "assets/naiwa/models/entity/naiwa.nwm": "e92b61a34e0af2ae09fa0402b35b02e797b4195879105225e2ef675d5d0c70d6"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.naiwa.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": ["LivingEntityMixin", "MobMixin", "FishingHookMixin", "BoatMixin", "FlightNetworkMixin"],
+  "client": ["HumanoidModelMixin", "PlayerModelMixin", "LivingRendererMixin", "ItemInHandRendererMixin", "ChestBlockEntityMixin", "AscensionSkyMixin", "IrisWorldTimeMixin"],
+  "injectors": {"defaultRequire": 1}
+}

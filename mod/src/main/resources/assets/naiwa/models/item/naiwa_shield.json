@@ -1,0 +1,4 @@
+{
+  "parent": "minecraft:item/shield",
+  "overrides": [{"predicate": {"blocking": 1}, "model": "naiwa:item/naiwa_shield_blocking"}]
+}
