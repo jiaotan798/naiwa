@@ -132,7 +132,7 @@ public final class AcceptanceProbe {
             screenshot = "04-laugh";
         }
         if (ticks == 230) screenshot = "05-laugh-motion";
-        if (ticks == 340) {
+        if (ticks == 355) {
             if (entity() == null || !entity().animation().equals("auto")) throw new IllegalStateException("奶蛙实际交互未恢复自动动作");
             screenshot = "06-laugh-restored";
         }

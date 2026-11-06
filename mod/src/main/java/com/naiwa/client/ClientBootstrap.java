@@ -26,7 +26,10 @@ public final class ClientBootstrap {
         NaiwaTotemCamera.register();
         NaiwaAscensionVisuals.register();
         bus.addListener(NaiwaAscensionVisuals::shaders);
+        bus.addListener(NaiwaGasParticles::register);
         NaiwaScopeTrigger.register();
+        bus.addListener((RegisterGuiLayersEvent event)->event.registerAboveAll(ResourceLocation.fromNamespaceAndPath("naiwa","scope_portrait"),
+                (graphics,delta)->NaiwaScopeTrigger.portrait(graphics)));
         bus.addListener((EntityRenderersEvent.RegisterRenderers event) -> event.registerEntityRenderer(Naiwa.ENTITY.get(), NaiwaRenderer::new));
         bus.addListener((EntityRenderersEvent.RegisterRenderers event) -> event.registerEntityRenderer(Naiwa.DECOY.get(), NaiwaDecoyRenderer::new));
         bus.addListener((EntityRenderersEvent.RegisterRenderers event) -> event.registerEntityRenderer(Naiwa.GAS_PROJECTILE.get(), net.minecraft.client.renderer.entity.ThrownItemRenderer::new));

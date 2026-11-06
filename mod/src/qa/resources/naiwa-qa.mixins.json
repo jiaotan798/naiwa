@@ -1,0 +1,1 @@
+{"required":true,"package":"com.naiwa.qa.mixin","compatibilityLevel":"JAVA_21","client":["BackgroundWindowMixin","BackgroundMouseMixin","WorldShaderTargetMixin"],"injectors":{"defaultRequire":1}}

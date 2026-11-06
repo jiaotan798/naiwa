@@ -1,0 +1,1 @@
+{"blend":{"func":"add","srcrgb":"one","dstrgb":"zero"},"vertex":"naiwa:holy_screen","fragment":"naiwa:holy_composite","attributes":["Position"],"samplers":[{"name":"DiffuseSampler"},{"name":"SceneSampler"}],"uniforms":[{"name":"OutSize","type":"float","count":2,"values":[1,1]}]}

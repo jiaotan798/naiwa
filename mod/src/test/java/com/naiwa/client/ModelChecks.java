@@ -14,6 +14,7 @@ public final class ModelChecks {
     public static void main(String[] args) throws Exception {
         totemCameraChecks();
         AscensionVisualChecks.check();
+        GasParticleChecks.check();
         byte[] bytes = Files.readAllBytes(Path.of("../assets/runtime/assets/naiwa/models/entity/naiwa.nwm"));
         var model = new NaiwaMesh(new ByteArrayInputStream(bytes));
         assert model.vertexCount == 3580 && model.boneCount == 38 && model.faceCount == 6997 && model.materialCount == 6;
@@ -28,6 +29,8 @@ public final class ModelChecks {
             if(material==5)for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++)assert(image.getRGB(x,y)>>>24)==0 : "旧眨眼遮片必须透明，不能露出黑片";
         }
         assert model.clips.keySet().equals(new java.util.LinkedHashSet<>(NaiwaAnimations.NAMES));
+        renderPreparationChecks(model);
+        actionPrecomputationChecks(model);
         // 后脑由颈骨带动，必须和脸一并保留；仅按头骨权重选面时，后界达不到 -4。
         var head = model.headFaces();
         int headCount=0; float rear=Float.POSITIVE_INFINITY, front=Float.NEGATIVE_INFINITY;
@@ -83,14 +86,108 @@ public final class ModelChecks {
         assert largest < .002 : "游戏蒙皮与原生编辑器不同，最大误差 BB 单位：" + largest;
         assert NaiwaAnimations.resolve("laugh_sequence", .59).name().equals("laugh_enter");
         assert NaiwaAnimations.resolve("laugh_sequence", .6).name().equals("laugh");
-        assert NaiwaAnimations.resolve("laugh_sequence", 7.639).name().equals("laugh") : "新模型最后 0.04 秒不得被旧边界截断";
-        assert NaiwaAnimations.resolve("laugh_sequence", 7.64).name().equals("laugh_exit");
-        assert Math.abs(NaiwaAnimations.length("laugh_sequence")-8.44)<1E-9;
-        assert Math.abs(NaiwaAnimations.resolve("laugh_sequence", 8.44).seconds()-.8)<1E-9;
+        assert NaiwaAnimations.resolve("laugh_sequence", 8.849).name().equals("laugh") : "新大笑不能在旧版边界提前收场";
+        assert NaiwaAnimations.resolve("laugh_sequence", 8.85).name().equals("laugh_exit");
+        assert Math.abs(NaiwaAnimations.length("laugh_sequence")-9.65)<1E-9;
+        assert Math.abs(NaiwaAnimations.resolve("laugh_sequence", 9.65).seconds()-.8)<1E-9;
         byte[] corrupt = bytes.clone(); corrupt[8] = 127;
         rejects(corrupt); rejects(Arrays.copyOf(bytes, 40));
         shieldSkin();
         System.out.println("11 段动画、33 组原生姿态对照、播放边界和损坏资源检查通过；最大蒙皮误差 BB 单位：" + largest);
+    }
+
+    /** 用优化前的逐顶点算法作独立基准，逐元素检查位置与法线，不只检查有限数或少量特征点。 */
+    private static void actionPrecomputationChecks(NaiwaMesh model) {
+        String[] actions={"","mirror","door_giggle","tree","tree_exposed","mine","mine_hide","fish","fish_land","boat","creeper_wait","scratch","diamond_point","diamond_caught","chest_peek","scope_close","unknown","mine_unknown"};
+        float[] actual=new float[model.vertexCount*3],actualNormals=actual.clone();
+        float[] expected=actual.clone(),expectedNormals=actual.clone();
+        float[] head=actual.clone(),headNormals=actual.clone();
+        Arrays.fill(head,-999);Arrays.fill(headNormals,-999);
+        boolean[] selected=new boolean[model.vertexCount];int previous=-1;
+        for(int vertex:model.headVertices) {assert vertex>previous;selected[vertex]=true;previous=vertex;}
+        assert model.headVertices.length>0&&model.headVertices.length<model.vertexCount;
+        int cases=0;
+        for(var clip:model.clips.values()) for(String action:actions)
+            for(double time:new double[]{-.1,0,clip.seconds()*.37,clip.seconds(),clip.seconds()+.5})
+                for(float pitch:new float[]{-90,0,67}) {
+                    model.pose(clip.name(),time,expected,expectedNormals);
+                    legacyAction(model,time,expected,expectedNormals,action,pitch);
+                    model.poseAction(clip.name(),time,actual,actualNormals,action,pitch);
+                    assert Arrays.equals(actual,expected)&&Arrays.equals(actualNormals,expectedNormals)
+                            : "姿势预计算不能改变位置或法线："+clip.name()+"/"+action+"/"+time+"/"+pitch;
+                    model.poseHeadAction(clip.name(),time,head,headNormals,action,pitch);
+                    for(int i=0;i<head.length;i++)assert selected[i/3]
+                            ?head[i]==actual[i]&&headNormals[i]==actualNormals[i]
+                            :head[i]==-999&&headNormals[i]==-999 : "头部必须与全身结果一致且不写入其他顶点";
+                    cases++;
+                }
+        System.out.println("姿势层预计算与旧算法 "+cases+" 组全顶点位置及法线精确对照通过");
+        System.out.println("头部路径 "+model.headVertices.length+"/"+model.vertexCount+" 顶点，"+cases+" 组位置、法线及未使用顶点检查通过");
+    }
+
+    /** 固定保留第二批优化前的运算顺序与骨号规则，不能改成调用预计算数组，否则失去对照意义。 */
+    private static void legacyAction(NaiwaMesh model,double seconds,float[] target,float[] normals,String action,float pitch) {
+        if(action.isEmpty())return;
+        for(int v=0;v<model.vertexCount;v++) {
+            float left=0,right=0,legs=0,head=0;
+            for(int j=0;j<model.joints[v].length;j++) {
+                int bone=model.joints[v][j];float weight=model.weights[v][j];
+                if(bone>=17&&bone<=18||bone==19||bone==36)left+=weight;
+                if(bone>=21&&bone<=22||bone==23||bone==37)right+=weight;
+                if(bone>=26&&bone<=35)legs+=weight;
+                if(bone>=4&&bone<=15)head+=weight;
+            }
+            float arms=switch(action) {
+                case "tree","tree_exposed","fish" -> -1.2F;
+                case "mine" -> (float)(-1.1+Math.sin(seconds*7)*.55);
+                case "mine_hide" -> .8F;
+                case "boat" -> (float)(-.8+Math.sin(seconds*4)*.4);
+                case "door_giggle" -> -.7F;
+                case "diamond_point" -> -1.3F;
+                case "scratch" -> -2.6F+(float)Math.sin(seconds*10)*.12F;
+                default -> 0;
+            };
+            float angle=arms*(action.startsWith("mine")||action.equals("diamond_point")||action.equals("scratch")?right:left+right);
+            if(angle!=0)legacyRotateX(target,normals,v,23,angle);
+            if(action.equals("fish_land")||action.equals("boat"))legacyRotateX(target,normals,v,12,-1.3F*legs);
+            if(action.equals("mirror")||action.startsWith("mine")||action.equals("scope_close"))legacyRotateX(target,normals,v,27,(float)Math.toRadians(pitch)*head);
+        }
+    }
+
+    private static void legacyRotateX(float[] points,float[] normals,int v,float y,float angle) {
+        int i=v*3;float c=(float)Math.cos(angle),s=(float)Math.sin(angle),dy=points[i+1]-y,dz=points[i+2]-0;
+        points[i+1]=y+dy*c-dz*s;points[i+2]=0+dy*s+dz*c;
+        float ny=normals[i+1],nz=normals[i+2];normals[i+1]=ny*c-nz*s;normals[i+2]=ny*s+nz*c;
+    }
+
+    /** 与旧筛选及手掌计算逐项对照，防止优化漏面、改序或取到渲染变换后的坐标。 */
+    private static void renderPreparationChecks(NaiwaMesh model) {
+        boolean[] head=model.headFaces();
+        for(boolean headOnly:new boolean[]{false,true}) {
+            int[][] groups=model.facesByMaterial(headOnly);
+            int total=0;
+            for(int m=0;m<model.materialCount;m++) {
+                int index=0;
+                for(int f=0;f<model.faceCount;f++) if(model.materials[f]==m&&(!headOnly||head[f])) {
+                    assert index<groups[m].length && groups[m][index++]==f : "材质分组必须保留原面序";
+                }
+                assert index==groups[m].length : "分组不能多出面片";
+                total+=index;
+            }
+            assert total==(headOnly?1654:model.faceCount) : "全身及头部面片不能遗漏";
+        }
+        float[] posed=new float[model.vertexCount*3],normals=posed.clone();
+        double[] hand=new double[3];
+        for(String clip:new String[]{"idle","laugh","jump"}) for(String action:new String[]{"fish","fish_land",""}) {
+            model.poseAction(clip,.5,posed,normals,action,0);
+            float x=0,y=0,z=0,total=0;
+            for(int v=0;v<model.vertexCount;v++) for(int j=0;j<model.joints[v].length;j++) {
+                int bone=model.joints[v][j];if(bone!=23&&bone!=37)continue;
+                float weight=model.weights[v][j];x+=posed[v*3]*weight;y+=posed[v*3+1]*weight;z+=posed[v*3+2]*weight;total+=weight;
+            }
+            model.rightHandPosition(posed,hand);
+            assert hand[0]==x/total/16 && hand[1]==y/total/16 && hand[2]==z/total/16+.08 : "手掌位置必须与原计算一致";
+        }
     }
 
     /** 对实际图像检查 UV 岛透明边界及所有面的绕序，防止生成贴图换版后出现缺面或错采样。 */

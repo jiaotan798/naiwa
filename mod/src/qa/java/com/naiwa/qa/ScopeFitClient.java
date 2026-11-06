@@ -27,7 +27,7 @@ final class ScopeFitClient {
     private void tick(){if(done)return;var mc=Minecraft.getInstance();try{
         if(mc.player==null||mc.level==null||mc.screen!=null||mc.getOverlay()!=null)return;
         if(live){liveTick(mc);return;}
-        if(mc.getMainRenderTarget().width!=1000||mc.getMainRenderTarget().height!=760){mc.getWindow().setWindowed(1000,760);org.lwjgl.glfw.GLFW.glfwRestoreWindow(mc.getWindow().getWindow());mc.resizeDisplay();return;}
+        if(mc.getMainRenderTarget().width!=1000||mc.getMainRenderTarget().height!=760){mc.getWindow().setWindowed(1000,760);if(Boolean.getBoolean("naiwa.qa.foreground"))org.lwjgl.glfw.GLFW.glfwRestoreWindow(mc.getWindow().getWindow());mc.resizeDisplay();return;}
         if(!Files.exists(MultiplayerCheck.ROOT.resolve(role+"-connected.ok")))MultiplayerCheck.write(role+"-connected.ok","PASS");
         String marker=Files.readString(MultiplayerCheck.ROOT.resolve("stage.txt")).trim();if(marker.isEmpty())return;int next=Integer.parseInt(marker);require(next!=-1,"服务端校准失败");
         if(next==99){MultiplayerCheck.write(role+"-result.txt","PASS native scope-fit measurements\n");mc.options.keyUse.setDown(false);done=true;mc.stop();return;}if(next==0)return;
@@ -49,7 +49,7 @@ final class ScopeFitClient {
         if(next==99){mc.options.keyUse.setDown(false);mc.options.keyUp.setDown(false);MultiplayerCheck.write(role+"-result.txt","PASS six native scope configurations\n");done=true;mc.stop();return;}if(next==0)return;
         if(next!=phase){phase=next;age=samples=0;fit=true;minX=minY=Double.POSITIVE_INFINITY;maxX=maxY=Double.NEGATIVE_INFINITY;mc.options.keyUp.setDown(false);}
         int index=phase/10,sub=phase%10;int[] trial=ScopeLiveCheck.CASES[index];
-        long window=mc.getWindow().getWindow();org.lwjgl.glfw.GLFW.glfwRestoreWindow(window);
+        long window=mc.getWindow().getWindow();if(Boolean.getBoolean("naiwa.qa.foreground"))org.lwjgl.glfw.GLFW.glfwRestoreWindow(window);
         if(mc.getMainRenderTarget().width!=trial[1]||mc.getMainRenderTarget().height!=trial[2]){mc.getWindow().setWindowed(trial[1],trial[2]);org.lwjgl.glfw.GLFW.glfwSetWindowSize(window,trial[1],trial[2]);mc.resizeDisplay();return;}
         age++;mc.options.fov().set(trial[0]);
         var frog=mc.level.getEntity(Integer.parseInt(Files.readString(MultiplayerCheck.ROOT.resolve("scope-fit-actor.txt")).trim())) instanceof NaiwaEntity n?n:null;
@@ -58,7 +58,7 @@ final class ScopeFitClient {
         boolean ready=false;
         if(sub==1)ready=age>=35&&(!actor||mc.player.isScoping());
         if(sub==3&&age>=90){
-            if(actor){require(samples>=30&&fit,"完整头部在原版镜圈内，采样="+samples+" fits="+fit+" bounds="+List.of(minX,minY,maxX,maxY));MultiplayerCheck.write("scope-live-"+index+".json",new Gson().toJson(Map.of("fov",trial[0],"width",trial[1],"height",trial[2],"pitch",trial[3],"fits",fit,"samples",samples,"bounds",List.of(minX,minY,maxX,maxY))));}
+            if(actor){verifyPortrait(mc);require(samples>=30&&fit,"镜内图片显示且本人标记有效，采样="+samples+" fits="+fit+" bounds="+List.of(minX,minY,maxX,maxY));MultiplayerCheck.write("scope-live-"+index+".json",new Gson().toJson(Map.of("fov",trial[0],"width",trial[1],"height",trial[2],"pitch",trial[3],"fits",fit,"samples",samples,"bounds",List.of(minX,minY,maxX,maxY))));}
             ready=true;
         }
         if(sub==4){
@@ -71,8 +71,22 @@ final class ScopeFitClient {
         if(sub==5){require(frog==null,"双端临时演员已清除");ready=age>=10;}
         if(ready&&!Files.exists(MultiplayerCheck.ROOT.resolve(role+"-live-"+phase+".ok"))){try(var png=Screenshot.takeScreenshot(mc.getMainRenderTarget())){png.writeToFile(MultiplayerCheck.ROOT.resolve(role+"-scope-live-"+index+"-"+sub+".png"));}MultiplayerCheck.write(role+"-live-"+phase+".ok","PASS");}
     }
+    /** 读取实际 GPU 画布，与原始图片三个内部采样点比较，避免只凭标记断言图片已绘制。 */
+    private void verifyPortrait(Minecraft mc)throws Exception {
+        try(var reference=NativeImage.read(mc.getResourceManager().open(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("naiwa","textures/gui/scope_portrait.png")));
+            var frame=Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
+            double side=Math.round(Math.min(mc.getWindow().getGuiScaledWidth(),mc.getWindow().getGuiScaledHeight())*1.125F*220/256);
+            double scale=(double)frame.getHeight()/mc.getWindow().getGuiScaledHeight();
+            for(double fraction:new double[]{.35,.5,.7}) {
+                int expected=reference.getPixelRGBA(150,(int)(fraction*314));
+                int actual=frame.getPixelRGBA(frame.getWidth()/2,(int)(frame.getHeight()/2.+(fraction-.5)*side*scale));
+                for(int shift:new int[]{0,8,16})require(Math.abs(((expected>>shift)&255)-((actual>>shift)&255))<=24,"GPU 图片采样与原图一致");
+            }
+        }
+    }
     private void render(RenderLevelStageEvent event){if(!actor||done||phase==0||live&&phase%10!=3||age<25||age>85||event.getStage()!=RenderLevelStageEvent.Stage.AFTER_ENTITIES)return;var mc=Minecraft.getInstance();try{
         if(!mc.player.isScoping())return;
+        if(live){var entity=mc.level.getEntity(Integer.parseInt(Files.readString(MultiplayerCheck.ROOT.resolve("scope-fit-actor.txt")).trim()));require(entity instanceof NaiwaEntity frog&&frog.scopeViewer()==mc.player.getId(),"真实镜内图片归属标记");double side=Math.min(mc.getWindow().getGuiScaledWidth(),mc.getWindow().getGuiScaledHeight())*1.125*220/256;minX=(mc.getWindow().getGuiScaledWidth()-side)/2;minY=(mc.getWindow().getGuiScaledHeight()-side)/2;maxX=minX+side;maxY=minY+side;samples++;return;}
         if(mesh==null){try(var in=mc.getResourceManager().open(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("naiwa","models/entity/naiwa.nwm"))){mesh=new NaiwaMesh(in);}points=new float[mesh.vertexCount*3];normals=points.clone();selected=new boolean[mesh.vertexCount];var head=mesh.headFaces();for(int f=0;f<mesh.faceCount;f++)if(head[f])for(int c=0;c<3;c++)selected[mesh.corners[f*3+c]]=true;try(var in=mc.getResourceManager().open(Gui.SPYGLASS_SCOPE_LOCATION)){mask=NativeImage.read(in);}}
         var frog=mc.level.getEntity(Integer.parseInt(Files.readString(MultiplayerCheck.ROOT.resolve("scope-fit-actor.txt")).trim())) instanceof NaiwaEntity n?n:null;if(frog==null)return;
         float partial=event.getPartialTick().getGameTimeDeltaPartialTick(false);var clip=frog.clip(partial);mesh.poseAction(clip.name(),clip.seconds(),points,normals,frog.act(),frog.getXRot());

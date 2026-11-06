@@ -89,7 +89,7 @@ final class ExtraCheck {
             else if(sub==1){
                 require(NaiwaPranks.busy(a),"双方确认演出时场景仍存在");
                 if(kind().equals("diamond"))require(diamondCount>=1&&!frog.isAddedToLevel()&&a.level().getBlockState(ORE).isAir()&&a.getMainHandItem().getDamageValue()==1,"真实挖掉矿石、扣一次耐久后出现诱饵，奶蛙尚未露出");
-                if(kind().equals("scope"))require(frog.isTemporary()&&frog.distanceToSqr(a)>=64,"空场开镜生成镜内距离的临时演员");
+                if(kind().equals("scope"))require(frog.isTemporary()&&Math.abs(frog.position().subtract(a.position()).horizontalDistance()-4)<.01&&frog.scopeViewer()==a.getId(),"空场开镜生成四格演员及本人图片标记");
                 if(kind().equals("chest"))require(frog.act().equals("chest_peek")&&frog.getBbHeight()<1,"箱内探头保留小尺寸，不站箱盖或翻倒");
                 stage(phase+1);
             } else if(sub==2){

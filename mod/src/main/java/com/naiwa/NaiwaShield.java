@@ -100,7 +100,7 @@ public final class NaiwaShield extends ShieldItem {
         }
     }
 
-    /** 调试初值：正面半角 60°、球形距离 4 格、力度 0.9；无额外伤害，不穿墙。 */
+    /** 图腾沿用四周 0.9；盾牌使用正面半角 60°、四格范围和水平 1.8，抬升上限不变。 */
     static void pushAround(ServerPlayer player) {push(player, Vec3.ZERO);}
 
     private static void push(ServerPlayer player, Vec3 facing) {
@@ -111,7 +111,8 @@ public final class NaiwaShield extends ShieldItem {
             Vec3 offset = target.position().subtract(player.position());
             Vec3 direction = new Vec3(offset.x, 0, offset.z).normalize();
             if (offset.lengthSqr() > 16 || direction.lengthSqr() < .5 || facing.lengthSqr() > 0 && facing.dot(direction) < .5 || !player.hasLineOfSight(target)) continue;
-            target.knockback(.9, -direction.x, -direction.z);
+            // 图腾沿用原力度；只有记录了水平朝向的盾牌释放增强，垂直上限仍由原版控制。
+            target.knockback(facing.lengthSqr()>0?1.8:.9, -direction.x, -direction.z);
             target.hurtMarked = true;
             if (target instanceof ServerPlayer other) other.connection.send(new ClientboundSetEntityMotionPacket(other));
         }

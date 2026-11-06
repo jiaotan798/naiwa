@@ -1,0 +1,22 @@
+{
+  "category": "misc",
+  "result": {
+    "id": "naiwa:naiwa_totem",
+    "count": 1
+  },
+  "type": "minecraft:crafting_shaped",
+  "group": "naiwa_totem",
+  "key": {
+    "T": {
+      "item": "minecraft:totem_of_undying"
+    },
+    "G": {
+      "item": "naiwa:laugh_gas_bottle"
+    }
+  },
+  "pattern": [
+    "  T",
+    "   ",
+    "G  "
+  ]
+}

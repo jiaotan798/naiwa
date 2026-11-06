@@ -5,3 +5,5 @@ license="All Rights Reserved"
 modId="naiwa_qa"
 version="1.0"
 displayName="奶蛙独立联机验收探针（不发布）"
+[[mixins]]
+config="naiwa-qa.mixins.json"

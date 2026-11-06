@@ -42,6 +42,10 @@ import net.neoforged.neoforge.event.level.BlockDropsEvent;
 public final class NaiwaPranks {
     private static final String NEXT="naiwa.prank_next", LAST="naiwa.prank_last", RESPAWN="naiwa.respawn_mock";
     private static final Map<UUID, Scene> SCENES=new HashMap<>();
+    // 只缓存候选几何，不缓存世界检查结果；拆墙、液体、实体和区块变化仍在下一 tick 生效。
+    private static final Map<UUID,MockCandidates> MOCK_CANDIDATES=new HashMap<>();
+    private record MockSpot(Vec3 position,BlockPos feet,net.minecraft.world.phys.AABB bounds) {}
+    private record MockCandidates(Vec3 origin,float yaw,double distance,List<MockSpot> spots) {}
     private static final Map<UUID, BlockPos> DOORS=new HashMap<>();
     private static final Map<UUID, BlockPos> CHESTS=new HashMap<>();
     private static final Map<UUID, ClosedChest> CLOSED_CHESTS=new HashMap<>();
@@ -97,19 +101,32 @@ public final class NaiwaPranks {
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST,NaiwaPranks::diamondDrops);
         NeoForge.EVENT_BUS.addListener((ServerStoppingEvent e)->{
             // 在最终世界保存前结算暂存钻石，不能等停服保存完才生成返还物。
-            for(Scene scene:SCENES.values())scene.close();SCENES.clear();
+            for(Scene scene:SCENES.values())scene.close();SCENES.clear();MOCK_CANDIDATES.clear();
         });
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent e) -> {
             for (Scene scene:SCENES.values()) scene.close();
-            SCENES.clear(); DOORS.clear();CHESTS.clear();CLOSED_CHESTS.clear();ATTENTION.clear();
+            SCENES.clear();MOCK_CANDIDATES.clear(); DOORS.clear();CHESTS.clear();CLOSED_CHESTS.clear();ATTENTION.clear();
         });
     }
 
     /** 复活和图腾落地待办也占用调度，前方受阻时不能被另一种整蛊抢走出场。 */
     public static boolean busy(ServerPlayer p) {return SCENES.containsKey(p.getUUID()) || p.getPersistentData().getBoolean(RESPAWN) || p.hasEffect(Naiwa.ASCENDING) || NaiwaGameplay.waitingForTotemLanding(p);}
-    /** 按当前场景中的实体实例识别演员，避免盾牌转化、空手逗笑及本体自动采气抢占场景结算。 */
-    public static boolean isActor(NaiwaEntity frog) {return SCENES.values().stream().anyMatch(scene->scene.frog==frog);}
-    public static boolean isDecoyActive(NaiwaDecoy decoy) {return SCENES.values().stream().anyMatch(scene->scene.decoy==decoy);}
+    /** 归属提示只定位场景，再按实体实例确认；取消、换场和重载后旧提示不会继续占用演员身份。 */
+    public static boolean isActor(NaiwaEntity frog) {
+        Scene scene=frog==null?null:SCENES.get(frog.prankOwner);
+        return scene!=null&&scene.frog==frog;
+    }
+    /** 不以实体 UUID 代替实例判断，防止卸载后的旧对象或重载副本误抑制真实钻石返还。 */
+    public static boolean isDecoyActive(NaiwaDecoy decoy) {
+        Scene scene=decoy==null?null:SCENES.get(decoy.prankOwner);
+        return scene!=null&&scene.decoy==decoy;
+    }
+
+    /** 四秒避让期间不能靠攻击包先于下一 tick 到达而提前识破；窗口未开始或已结束仍可识破。 */
+    static boolean canExposeDecoy(NaiwaDecoy decoy) {
+        Scene scene=SCENES.get(decoy.prankOwner);
+        return scene==null||scene.decoy!=decoy||scene.escapeStart<0||decoy.level().getGameTime()-scene.escapeStart>=80;
+    }
 
     /** 保留旧版借用本体的恢复格式；当前望远镜只用临时演员，不再往常驻实体写入恢复标记。 */
     static void saveScopeActor(NaiwaEntity frog,net.minecraft.nbt.CompoundTag tag) {
@@ -205,7 +222,7 @@ public final class NaiwaPranks {
         return false;
     }
 
-    /** 诱饵最多后退两次；每 0.2 格验证站位及危险地面，不加载区块、不把玩家引向坑、岩浆或火源。 */
+    /** 每 0.2 格验证避让路线及危险地面，不加载区块、不把玩家引向坑、岩浆或火源。 */
     static boolean lurePath(ServerLevel level,Vec3 from,Vec3 to) {
         int steps=Math.max(1,(int)Math.ceil(from.distanceTo(to)/.2));
         for(int i=0;i<=steps;i++) {
@@ -241,7 +258,7 @@ public final class NaiwaPranks {
             NaiwaDecoy decoy=Naiwa.DECOY.get().create(p.level());decoy.setPos(first);
             if(!p.serverLevel().addFreshEntity(decoy))return false;
             // 暂存于可保存的非物品实体，漏斗无法提取；场景尚未建立前不把钻石从原版列表移除。
-            Scene scene=begin(p,"diamond",frog,null);scene.decoy=decoy;scene.takeoff=direction;scene.land=actorPoint;
+            Scene scene=begin(p,"diamond",frog,null);scene.decoy=decoy;decoy.prankOwner=p.getUUID();scene.takeoff=direction;scene.land=actorPoint;scene.hopTo=first;
             decoy.holdDiamonds(diamonds);return true;
         }
         return false;
@@ -256,16 +273,17 @@ public final class NaiwaPranks {
         begin(p,"chest",frog,pos.immutable());frog.setNoGravity(true);frog.play("idle");return true;
     }
 
-    /** 使用望远镜即可申请临时演员；距离来自实际镜内投影，不要求世界中已有或瞄准奶蛙。 */
+    /** 真实开镜后在水平正前方四格找安全地面；图片标记只属于本轮触发者，不借用常驻奶蛙。 */
     static boolean startScope(ServerPlayer p,int distance) {
-        if(distance<8||distance>64||!ready(p)||!allowed(p,"scope")||!p.isUsingItem()||!p.getUseItem().is(Items.SPYGLASS))return false;
-        Vec3 look=p.getLookAngle();double horizontal=look.horizontalDistance();if(horizontal<.05)return false;
-        // 水平距离固定，仰俯角决定高度；无重力临时演员不会因开镜看向空中而下坠。被地形挡住则拒绝。
-        Vec3 point=p.position().add(look.scale(distance/horizontal));
-        if(point.distanceToSqr(p.position())>16384||!safe(p.serverLevel(),point,false)
-                ||!NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),point.add(0,1.7,0)))return false;
+        if(distance!=4||!ready(p)||!allowed(p,"scope")||!p.isUsingItem()||!p.getUseItem().is(Items.SPYGLASS))return false;
+        Vec3 forward=Vec3.directionFromRotation(0,p.getYRot()),point=null;
+        for(int dy:new int[]{0,-1,1,-2,2}) {
+            Vec3 candidate=p.position().add(forward.scale(4)).add(0,dy,0);
+            if(safe(p.serverLevel(),candidate,true)&&NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),candidate.add(0,1.7,0))){point=candidate;break;}
+        }
+        if(point==null)return false;
         NaiwaEntity frog=prepareActor(p.serverLevel(),point);if(frog==null)return false;
-        frog.setNoGravity(true);frog.setYRot(p.getYRot()+180);frog.setYHeadRot(frog.getYRot());frog.yBodyRot=frog.getYRot();frog.setXRot(-p.getXRot());frog.setAct("scope_close");frog.play("idle");
+        frog.setYRot(p.getYRot()+180);frog.setYHeadRot(frog.getYRot());frog.yBodyRot=frog.getYRot();frog.play("idle");frog.setScopeViewer(p.getId());
         if(!p.serverLevel().addFreshEntity(frog))return false;
         Scene scene=begin(p,"scope",frog,null);scene.land=p.position();return true;
     }
@@ -349,10 +367,12 @@ public final class NaiwaPranks {
     }
 
     static boolean safe(ServerLevel level,Vec3 pos,boolean ground) {
-        BlockPos feet=BlockPos.containing(pos);
+        return safe(level,pos,ground,BlockPos.containing(pos),null);
+    }
+    private static boolean safe(ServerLevel level,Vec3 pos,boolean ground,BlockPos feet,net.minecraft.world.phys.AABB cachedBounds) {
         if (!level.hasChunkAt(feet) || pos.y<level.getMinBuildHeight() || pos.y+2>=level.getMaxBuildHeight()) return false;
         if (ground && !level.getBlockState(feet.below()).isFaceSturdy(level,feet.below(),Direction.UP)) return false;
-        var box=new net.minecraft.world.phys.AABB(pos.x-.45,pos.y,pos.z-.45,pos.x+.45,pos.y+2,pos.z+.45);
+        var box=cachedBounds!=null?cachedBounds:new net.minecraft.world.phys.AABB(pos.x-.45,pos.y,pos.z-.45,pos.x+.45,pos.y+2,pos.z+.45);
         if (!level.hasChunkAt(BlockPos.containing(box.minX,box.minY,box.minZ)) || !level.hasChunkAt(BlockPos.containing(box.maxX,box.maxY,box.maxZ))) return false;
         return level.getWorldBorder().isWithinBounds(box) && level.noCollision(box) && !level.containsAnyLiquid(box);
     }
@@ -382,7 +402,7 @@ public final class NaiwaPranks {
     }
 
     private static Scene begin(ServerPlayer p,String kind,NaiwaEntity frog,BlockPos anchor) {
-        Scene scene=new Scene(kind,frog,anchor,p.level().getGameTime()); SCENES.put(p.getUUID(),scene);
+        Scene scene=new Scene(p,kind,frog,anchor,p.level().getGameTime()); SCENES.put(p.getUUID(),scene);
         p.getPersistentData().putString(LAST,kind);
         // 开始时固定本轮等待，重载设置不重置已排定冷却；零间隔也由 SCENES 保证同一玩家不会重叠演出。
         p.getPersistentData().putLong(NEXT,p.level().getGameTime()+NaiwaConfig.nextIntervalTicks(p.getRandom()));
@@ -485,33 +505,44 @@ public final class NaiwaPranks {
 
     /** 死亡复活和图腾落地共用当前水平正前方出场；只建临时演员，不挪用常驻奶蛙。 */
     public static boolean mock(ServerPlayer p) {
-        return mock(p,NaiwaConfig.RESPAWN_APPEAR_DISTANCE.get());
+        return mockAtThreeBlocks(p);
     }
 
-    /** 每次尝试读取对应场景的当前设置；成功后位置固定，受阻兜底只沿正前方且不越配置上限。 */
-    private static boolean mock(ServerPlayer p,double preferredDistance) {
+    /** 正前方三格只尝试原高度、上方和下方；受阻保留待办，不能扩大水平距离。 */
+    private static boolean mockAtThreeBlocks(ServerPlayer p) {
+        double preferredDistance=3;
         if(!p.isAlive()||p.isSpectator()||p.hasEffect(Naiwa.ASCENDING)||SCENES.containsKey(p.getUUID()))return false;
-        Vec3 forward=Vec3.directionFromRotation(0,p.getYRot());
-        // 保留默认 2.5 / 3.5 / 4.5 格的避障行为；自定义值同样只向外加一或两格。
-        for(int extra=0;extra<=2;extra++)for(int dy:new int[]{0,1,-1}) {
-            double distance=preferredDistance+extra;if(distance>NaiwaConfig.MAX_APPEAR_DISTANCE)continue;
-            Vec3 horizontal=p.position().add(forward.scale(distance));
-            Vec3 spot=new Vec3(horizontal.x,p.getBlockY()+dy,horizontal.z);
+        MockCandidates candidates=MOCK_CANDIDATES.get(p.getUUID());
+        if(candidates==null||!candidates.origin.equals(p.position())||candidates.yaw!=p.getYRot()||candidates.distance!=preferredDistance) {
+            var spots=new java.util.ArrayList<MockSpot>();Vec3 forward=Vec3.directionFromRotation(0,p.getYRot());
+            // 顺序仍为每个正前方距离依次尝试原高度、上方、下方；仅在输入变化时重建。
+            {
+                Vec3 horizontal=p.position().add(forward.scale(preferredDistance));
+                for(int dy:new int[]{0,1,-1}) {
+                    Vec3 spot=new Vec3(horizontal.x,p.getBlockY()+dy,horizontal.z);
+                    spots.add(new MockSpot(spot,BlockPos.containing(spot),new net.minecraft.world.phys.AABB(spot.x-.45,spot.y,spot.z-.45,spot.x+.45,spot.y+2,spot.z+.45)));
+                }
+            }
+            candidates=new MockCandidates(p.position(),p.getYRot(),preferredDistance,spots);MOCK_CANDIDATES.put(p.getUUID(),candidates);
+        }
+        for(MockSpot candidate:candidates.spots) {
+            Vec3 spot=candidate.position;
             // 不沿左右候选圈兜底，不加载新区块；完整身体、实体支撑和眼睛视线均通过后才入场。
-            if(!safe(p.serverLevel(),spot,true)||!NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),spot.add(0,1.5,0)))continue;
+            if(!safe(p.serverLevel(),spot,true,candidate.feet,candidate.bounds)||!NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),spot.add(0,1.5,0)))continue;
             NaiwaEntity frog=create(p.serverLevel(),spot);if(frog==null)continue;
             frog.setYRot(net.minecraft.util.Mth.wrapDegrees(p.getYRot()+180));frog.setYHeadRot(frog.getYRot());frog.yBodyRot=frog.getYRot();
-            Scene scene=new Scene("mock",frog,null,p.level().getGameTime());SCENES.put(p.getUUID(),scene);scene.success(p);return true;
+            Scene scene=new Scene(p,"mock",frog,null,p.level().getGameTime());SCENES.put(p.getUUID(),scene);MOCK_CANDIDATES.remove(p.getUUID());scene.success(p);return true;
         }
         return false;
     }
 
     /** 图腾额外等待真实落地；死亡嘲笑则在原版复活后即可按当前朝向入场。 */
     static boolean mockAfterTotemLanding(ServerPlayer p) {
-        return NaiwaGameplay.onSolidGround(p)&&mock(p,NaiwaConfig.TOTEM_LANDING_APPEAR_DISTANCE.get());
+        return NaiwaGameplay.onSolidGround(p)&&mockAtThreeBlocks(p);
     }
 
     public static void cancel(ServerPlayer p) {
+        MOCK_CANDIDATES.remove(p.getUUID());
         Scene scene=SCENES.remove(p.getUUID()); if (scene!=null) scene.close(); DOORS.remove(p.getUUID());
         CHESTS.remove(p.getUUID());CLOSED_CHESTS.remove(p.getUUID());ATTENTION.remove(p.getUUID());
     }
@@ -525,15 +556,15 @@ public final class NaiwaPranks {
         long laughing=-1,lastDig,closed=-1,landed=-1;
         BlockPos pendingMinedBlock;net.minecraft.world.level.block.state.BlockState pendingMinedState;boolean mined;
         BlockHitResult mineFace;long mineObserved=-1;
-        // hopped 为当前半秒跳动的起始 tick，-1 表示静止；hops 仅从 0 增至 2，不重置追逐来回刷奖励。
-        long failed=-1,hopped=-1;
-        NaiwaDecoy decoy;Vec3 hopFrom,hopTo;int hops;
-        int openings;
-        boolean previousOpen=true;
+        // 四秒窗口只从第一次进入四格范围开始，后续避让不续期；hopped 控制半秒原地小跳。
+        long failed=-1,hopped=-1,escapeStart=-1;
+        NaiwaDecoy decoy;Vec3 hopTo;
         Boat boat; Vec3 land,takeoff; Direction.Axis axis; double plane,side;
         long boatIdle=-1,boatChange=-1,boatObserved=-1;
-        Scene(String kind,NaiwaEntity frog,BlockPos anchor,long start) {
+        Scene(ServerPlayer owner,String kind,NaiwaEntity frog,BlockPos anchor,long start) {
             this.kind=kind;this.frog=frog;this.anchor=anchor;this.start=start;
+            // 所有场景（含不走 begin 的复活/图腾嘲笑）统一绑定；清理仍只以 SCENES 为准。
+            frog.prankOwner=owner.getUUID();
             initialHand=frog.getMainHandItem();initialAct=frog.act();
             initialPosition=frog.position();initialNoAi=frog.isNoAi();
         }
@@ -546,7 +577,7 @@ public final class NaiwaPranks {
         }
         boolean watching(ServerPlayer p) {
             Vec3 direction=frog.getEyePosition().subtract(p.getEyePosition());
-            // 窄 FOV 的真实望远镜需要更远演员；普通整蛊仍保留十二格观察范围。
+            // 观察必须同时满足距离、视锥及真实视线；镜内图片标记不替代放下后的观察检查。
             return direction.lengthSqr()<(kind.equals("scope")?16384:144) && p.getLookAngle().dot(direction.normalize())>.5 && p.hasLineOfSight(frog);
         }
         /** 装作挖最近的可见方块，不能追随玩家转头；目标被挖掉后才重新选点。 */
@@ -564,7 +595,8 @@ public final class NaiwaPranks {
             if (laughing>=0) {
                 // 奖励归本轮触发者；矿洞及望远镜演员本就较远，自动收集不再要求玩家赶到三格内。
                 frog.collectAutomatically(p);
-                return now-laughing<170;
+                // 留场覆盖源模型完整三段及一个结算 tick，换长动画时不能提前删演员、返钻石或关闭箱盖。
+                return now-laughing<Math.ceil(NaiwaAnimations.length("laugh_sequence")*20)+1;
             }
             if (frog.hurtTime>0) return false;
             if (now-start>(kind.equals("fish")?1800:600) || shield(p) || p.hasEffect(Naiwa.ASCENDING)) return false;
@@ -591,16 +623,17 @@ public final class NaiwaPranks {
                         decoy.setInvisible(true);if(!frog.isAddedToLevel()&&!p.serverLevel().addFreshEntity(frog))return false;
                         failed=now;frog.setAct("diamond_caught");frog.play("idle");break;
                     }
-                    if(hopped>=0) {
-                        double t=Math.min(1,(now-hopped)/10.0);decoy.setPos(hopFrom.lerp(hopTo,t).add(0,Math.sin(t*Math.PI)*.25,0));
-                        if(t>=1) {
-                            hopped=-1;
-                            if(hops==2) {if(!p.serverLevel().addFreshEntity(frog))return false;landed=now;frog.setAct("diamond_point");frog.play("idle");}
+                    if(escapeStart>=0&&now-escapeStart>=80) {
+                        if(landed<0){decoy.setPos(hopTo);frog.setPos(hopTo);if(!p.serverLevel().addFreshEntity(frog))return false;landed=now;frog.setAct("diamond_point");frog.play("idle");}
+                    } else {
+                        Vec3 delta=hopTo.subtract(p.position()).multiply(1,0,1);double distance=delta.length();
+                        if(distance<4) {
+                            Vec3 direction=distance>1e-7?delta.scale(1/distance):takeoff;
+                            Vec3 target=hopTo.add(direction.scale(4.05-distance));
+                            if(!lurePath(p.serverLevel(),hopTo,target))return false;
+                            hopTo=target;land=target;frog.setPos(target);hopped=now;if(escapeStart<0)escapeStart=now;
                         }
-                    } else if(hops<2 && p.distanceToSqr(decoy)<3.24) {
-                        hopFrom=decoy.position();hopTo=hopFrom.add(takeoff.scale(1.3));
-                        if(!lurePath(p.serverLevel(),p.position(),hopTo))return false;
-                        hops++;hopped=now;
+                        if(hopped>=0){double t=Math.min(1,(now-hopped)/10.0);decoy.setPos(hopTo.add(0,Math.sin(t*Math.PI)*.25,0));if(t>=1)hopped=-1;}
                     }
                     if(landed>=0 && now-landed>=10 && watching(p)) {decoy.setInvisible(true);decoy.setPos(frog.position());success(p);}
                 }
@@ -609,10 +642,10 @@ public final class NaiwaPranks {
                     if(now-start>=40&&p.containerMenu==p.inventoryMenu&&watching(p))success(p);
                 }
                 case "scope" -> {
-                    // 开镜期间不接管镜头；移动超过三格或转头即清场，放下后连续看见半秒才成功。
-                    if(p.position().distanceToSqr(land)>9||!watching(p))return false;
+                    // 镜内图片只受真实开镜控制；放下后撤图，再检查是否看见四格处演员。
+                    if(p.position().distanceToSqr(land)>9)return false;
                     if(p.isUsingItem()) {if(!p.getUseItem().is(Items.SPYGLASS))return false;}
-                    else {if(landed<0)landed=now;if(now-landed>=10)success(p);}
+                    else {frog.setScopeViewer(-1);if(!watching(p))return false;if(landed<0)landed=now;if(now-landed>=10)success(p);}
                 }
                 case "mirror" -> {
                     if (!p.level().getBlockState(anchor).is(Blocks.GLASS) || (coordinate(p.position(),axis)-plane)*side<=0) return false;
@@ -634,13 +667,10 @@ public final class NaiwaPranks {
                     var state=p.level().getBlockState(anchor);
                     if (!state.is(BlockTags.WOODEN_DOORS)) return false;
                     boolean open=state.getValue(DoorBlock.OPEN);
-                    if (open!=previousOpen) {
-                        if (!open) {closed=now; frog.setAct("door_giggle"); frog.play("laugh_enter");
-                            p.level().playSound(null,frog,Naiwa.SHIELD_LAUGH.get(),SoundSource.NEUTRAL,.4F,1);}
-                        else if (++openings>=2 && now-closed<=30 && watching(p)) success(p);
-                        else {frog.play("idle");frog.setAct("door");}
-                        previousOpen=open;
-                    }
+                    // 到期先结算；及时关门仅记录时间，不播短笑。关门三秒内重开才大笑。
+                    if(closed<0){if(now-start>=60)success(p);else if(!open)closed=now;}
+                    else if(now-closed>=60)return false;
+                    else if(open)success(p);
                 }
                 case "tree" -> {
                     if (!p.level().getBlockState(anchor).is(BlockTags.LOGS)) {
@@ -724,6 +754,7 @@ public final class NaiwaPranks {
         void close() {
             Vec3 refund=decoy!=null&&!frog.isAddedToLevel()?decoy.position():frog.position();
             frog.setBoatSteering(0);
+            frog.setScopeViewer(-1);
             frog.stopRiding();
             if (frog.isTemporary()) frog.discard();
             else {

@@ -29,7 +29,10 @@ final class NaiwaPlayerRenderer {
     private static void player(RenderPlayerEvent.Pre e) {
         var player=e.getEntity(); var effect=player.getEffect(Naiwa.ASCENDING);
         if (effect==null || player.isInvisible()) return;
-        e.setCanceled(true); var pose=e.getPoseStack(); pose.pushPose();
+        e.setCanceled(true);
+        // 主视图实体推迟至光影完成后绘制；天空之前的 Iris 阴影与物品栏预览仍沿用原模型入口。
+        if(NaiwaAscensionVisuals.worldPass())return;
+        var pose=e.getPoseStack(); pose.pushPose();
         pose.mulPose(Axis.YP.rotationDegrees(-Mth.rotLerp(e.getPartialTick(),player.yBodyRotO,player.yBodyRot)));
         int stage=effect.getAmplifier();
         // 起手映射原生展臂入场，悬停和缓降保持同一姿势；浮动只影响模型，不累积实际高度。
@@ -40,6 +43,21 @@ final class NaiwaPlayerRenderer {
         int light=player==Minecraft.getInstance().player&&NaiwaAscensionVisuals.active()?net.minecraft.client.renderer.LightTexture.FULL_BRIGHT:e.getPackedLight();
         model().draw(clip,time,pose,e.getMultiBufferSource(),light,OverlayTexture.NO_OVERLAY,false);
         pose.popPose();
+    }
+
+    /** 使用与原玩家替换相同的朝向和片段，位置按实际渲染分数帧插值，不移动实体。 */
+    static void world(net.minecraft.world.entity.player.Player player,float partial,net.minecraft.client.Camera camera,
+                      net.minecraft.client.renderer.MultiBufferSource.BufferSource buffers) {
+        var effect=player.getEffect(Naiwa.ASCENDING);if(effect==null)return;
+        if(player==Minecraft.getInstance().player&&!camera.isDetached())return;
+        var pose=new com.mojang.blaze3d.vertex.PoseStack();var eye=camera.getPosition();
+        pose.translate(Mth.lerp(partial,player.xOld,player.getX())-eye.x,Mth.lerp(partial,player.yOld,player.getY())-eye.y,Mth.lerp(partial,player.zOld,player.getZ())-eye.z);
+        pose.mulPose(Axis.YP.rotationDegrees(-Mth.rotLerp(partial,player.yBodyRotO,player.yBodyRot)));
+        int stage=effect.getAmplifier();
+        double time=stage==0?Math.clamp((15-effect.getDuration()+partial)*.06,0,.6):(player.tickCount+partial)/20.0;
+        if(stage==2)pose.translate(0,Math.sin(time*3)*.025,0);
+        float reveal=stage==0?(float)Mth.smoothstep(Mth.clamp((15-effect.getDuration()+partial)/10F,0,1)):1;
+        model().drawFlight(stage==0?"ascend_enter":"ascend_hover",time,pose,buffers,reveal);
     }
     /** 飞升时第一人称不显示手或手持物，只取消绘制；效果结束后自然交回原版。 */
     private static void hand(RenderHandEvent e) {

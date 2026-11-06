@@ -49,6 +49,8 @@ public final class NaiwaGameplay {
     private static final String SAFE_FALL = "naiwa.safe_fall";
     private static final String OLD_GRAVITY = "naiwa.original_gravity";
     private static final Map<UUID, Long> LEAKS = new HashMap<>();
+    // 只缓存命中槽位，每次先验证；不缓存“没有”，避免漏掉同 tick 的直接改槽、拾取或指令补入。
+    private static final Map<ServerPlayer,Integer> GAS_SLOTS=new java.util.WeakHashMap<>();
     private static final Map<UUID, Flight> FLIGHTS = new HashMap<>();
     // 单位 tick（20 tick/秒）；悬停六秒，攻击保护三十秒，覆盖完整演出与落地恢复。
     static final int HOVER_TICKS=120, TOTEM_PROTECTION_TICKS=600;
@@ -119,18 +121,26 @@ public final class NaiwaGameplay {
 
     /** 仅主背包、快捷栏和副手计入携带；不遍历容器，瓶数不改变漏气频率。 */
     static boolean carrying(ServerPlayer player) {
-        for (ItemStack stack : player.getInventory().items) if (stack.is(Naiwa.GAS.get())) return true;
-        return player.getOffhandItem().is(Naiwa.GAS.get());
+        var inventory=player.getInventory();Integer cached=GAS_SLOTS.get(player);
+        if(cached!=null&&inventory.getItem(cached).is(Naiwa.GAS.get()))return true;
+        if(player.getOffhandItem().is(Naiwa.GAS.get())) {GAS_SLOTS.put(player,net.minecraft.world.entity.player.Inventory.SLOT_OFFHAND);return true;}
+        for(int slot=0;slot<inventory.items.size();slot++)if(inventory.getItem(slot).is(Naiwa.GAS.get())) {GAS_SLOTS.put(player,slot);return true;}
+        GAS_SLOTS.remove(player);return false;
     }
 
     /** 飞升恢复后继续等待实体地面；模型超时结束、入水或载具接触均不能提前播放落地嘲笑。 */
     private static void tick(ServerTickEvent.Post event) {
+        // 同世界相近玩家共用空间查询；远处分组的包围盒过大时回退逐玩家查询，不扫描中间大片无关区域。
+        Map<net.minecraft.server.level.ServerLevel,java.util.List<ServerPlayer>> protectedPlayers=null;
+        for(ServerPlayer p:event.getServer().getPlayerList().getPlayers())if(p.level().getGameTime()%20==0&&protectedFromMobs(p)) {
+            if(protectedPlayers==null)protectedPlayers=new java.util.IdentityHashMap<>();
+            protectedPlayers.computeIfAbsent(p.serverLevel(),key->new java.util.ArrayList<>()).add(p);
+        }
+        if(protectedPlayers!=null)for(var players:protectedPlayers.values())clearMobTargets(players);
         for (ServerPlayer p : event.getServer().getPlayerList().getPlayers()) {
             if (!p.isAlive() || p.isSpectator()) {cleanup(p); continue;}
             Long protection=MOB_PROTECTION.get(p.getUUID());
             if(protection!=null&&p.level().getGameTime()>=protection)MOB_PROTECTION.remove(p.getUUID());
-            // 目标变更事件拦截新仇恨；每秒补查一次，清除已有的普通目标及 Brain 攻击记忆。
-            if(protectedFromMobs(p)&&p.level().getGameTime()%20==0)clearMobTargets(p);
             Flight flight = FLIGHTS.get(p.getUUID());
             if (flight != null) {
                 LEAKS.remove(p.getUUID());
@@ -178,11 +188,27 @@ public final class NaiwaGameplay {
     /** 仅清除指向本玩家的攻击，不暂停其他生物 AI；六十四格覆盖附近已在追击的普通及远程生物。 */
     private static void clearMobTargets(ServerPlayer p) {
         for(Mob mob:p.level().getEntitiesOfClass(Mob.class,p.getBoundingBox().inflate(64),Mob::isAlive)) {
-            boolean target=mob.getTarget()==p,remembered=mob.getBrain().isMemoryValue(MemoryModuleType.ATTACK_TARGET,p);
-            if(target)mob.setTarget(null);
-            if(remembered)mob.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
-            if(target||remembered) {mob.getNavigation().stop();mob.setAggressive(false);}
+            clearMobTarget(p,mob);
         }
+    }
+
+    /** 合并扫描不扩大保护范围：仍逐玩家检查原 64 格包围盒，普通目标与 Brain 目标独立清除。 */
+    static void clearMobTargets(java.util.List<ServerPlayer> players) {
+        if(players.size()==1) {clearMobTargets(players.getFirst());return;}
+        if(players.isEmpty())return;
+        var boxes=new java.util.ArrayList<net.minecraft.world.phys.AABB>();
+        net.minecraft.world.phys.AABB union=null;double volume=0;
+        for(var p:players) {var box=p.getBoundingBox().inflate(64);boxes.add(box);union=union==null?box:union.minmax(box);volume+=box.getXsize()*box.getYsize()*box.getZsize();}
+        if(union.getXsize()*union.getYsize()*union.getZsize()>volume) {for(var p:players)clearMobTargets(p);return;}
+        for(Mob mob:players.getFirst().level().getEntitiesOfClass(Mob.class,union,Mob::isAlive))
+            for(int i=0;i<players.size();i++)if(boxes.get(i).intersects(mob.getBoundingBox()))clearMobTarget(players.get(i),mob);
+    }
+
+    private static void clearMobTarget(ServerPlayer p,Mob mob) {
+        boolean target=mob.getTarget()==p,remembered=mob.getBrain().isMemoryValue(MemoryModuleType.ATTACK_TARGET,p);
+        if(target)mob.setTarget(null);
+        if(remembered)mob.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
+        if(target||remembered) {mob.getNavigation().stop();mob.setAggressive(false);}
     }
 
     /** 在原版图腾检查的入口调用，按原版主副手顺序、伤害豁免及取消事件处理。 */
@@ -239,6 +265,7 @@ public final class NaiwaGameplay {
 
     /** 退出、换维度、死亡或主动中断取消落地演出；尚未落地的一次免摔资格仍按原规则保留。 */
     public static void cleanup(ServerPlayer p) {
+        GAS_SLOTS.remove(p);
         MOB_PROTECTION.remove(p.getUUID());
         LANDING_MOCKS.remove(p.getUUID());
         Flight old=FLIGHTS.get(p.getUUID());

@@ -22,10 +22,10 @@ if (process.argv.includes('--check')) {
   console.log('模型源文件与采样产物 SHA256 一致');
   process.exit(0);
 }
+// 普通构建只校验已提交产物；重新采样才要求调用者指定编辑器。
+const blockbench=process.env.BLOCKBENCH;
+assert.ok(blockbench,'重新采样须用 BLOCKBENCH 指定 Blockbench 5.2.1；普通构建使用 --check');
 const model = JSON.parse(sourceBytes);
-// 普通构建仅校验已提交资源；只有重新采样时才要求明确指定编辑器。
-const blockbench = process.env.BLOCKBENCH;
-assert.ok(blockbench, '重新采样需用 BLOCKBENCH 指定 Blockbench 5.2.1 可执行文件；资源校验可用 --check');
 const bones = model.elements.filter(e => e.type === 'armature_bone');
 const meshes = model.elements.filter(e => e.type === 'mesh');
 assert.equal(meshes.length, 1, '当前接入资产必须为一张带权重网格');
@@ -194,7 +194,7 @@ try {
   console.log('采样完成：' + vertexKeys.length + ' 顶点、' + faces.length + ' 三角面、' + clips.length + ' 段动画；原文件未修改');
 } finally {
   // 便携启动器会再派生 Electron；退出时清理本脚本启动的进程树，不能只结束启动器。
-  if (process.platform === 'win32' && child.pid && child.exitCode === null) await new Promise(resolve => {
+  if (child.pid && child.exitCode === null) await new Promise(resolve => {
     const cleanup = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {windowsHide: true, stdio: 'ignore'});
     cleanup.once('error', resolve); cleanup.once('exit', resolve);
   });

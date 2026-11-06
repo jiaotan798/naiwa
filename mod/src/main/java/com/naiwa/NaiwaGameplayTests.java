@@ -52,6 +52,106 @@ public final class NaiwaGameplayTests {
         p.setXRot((float)-Math.toDegrees(Math.atan2(delta.y,delta.horizontalDistance())));
     }
 
+    /** 命中槽位只作提示，直接改槽和原地改栈都须在同次查询立即生效。 */
+    @GameTest(template="empty",timeoutTicks=30)
+    public static void gasSlotHintMatchesLiveInventory(GameTestHelper h) {
+        var p=player(h);
+        try {
+            for(int i=0;i<120;i++) {
+                int slot=new int[]{0,12,35,net.minecraft.world.entity.player.Inventory.SLOT_OFFHAND}[i%4];
+                if(i%3==0)p.getInventory().setItem(slot,new ItemStack(Naiwa.GAS.get()));
+                else if(i%3==1)p.getInventory().getItem(slot).setCount(0);
+                else p.getInventory().setItem(slot,ItemStack.EMPTY);
+                boolean expected=p.getInventory().items.stream().anyMatch(stack->stack.is(Naiwa.GAS.get()))||p.getOffhandItem().is(Naiwa.GAS.get());
+                h.assertTrue(NaiwaGameplay.carrying(p)==expected,"携带命中缓存必须与实时背包一致："+i);
+            }
+            h.succeed();
+        } finally {NaiwaGameplay.cleanup(p);NaiwaShieldTests.remove(p);}
+    }
+
+    /** 合并只减少空间查询，仍按每个玩家原范围清除目标，不能保护附近的无关玩家。 */
+    @GameTest(template="empty",timeoutTicks=30)
+    public static void groupedMobSweepKeepsOriginalRange(GameTestHelper h) {
+        var first=player(h);var second=player(h);var other=player(h);second.setPos(first.position().add(3,0,0));
+        var a=h.spawn(EntityType.HUSK,4,3,4);var b=h.spawn(EntityType.HUSK,5,3,4);var c=h.spawn(EntityType.PIGLIN,6,3,4);var unrelated=h.spawn(EntityType.HUSK,7,3,4);
+        a.setNoAi(true);b.setNoAi(true);c.setNoAi(true);unrelated.setNoAi(true);
+        try {
+            // 猪灵 getTarget 本身来自 Brain，不能用它伪造两个互不相干的目标；另设尸壳验证无关目标保留。
+            a.setTarget(first);b.setTarget(second);unrelated.setTarget(other);c.getBrain().setMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET,first);
+            NaiwaGameplay.clearMobTargets(List.of(first,second));
+            h.assertTrue(a.getTarget()==null&&b.getTarget()==null,"相近玩家共用查询后分别解除追击");
+            h.assertTrue(unrelated.getTarget()==other&&!c.getBrain().isMemoryValue(net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET,first),"清理 Brain 攻击记忆时保留无关生物目标");
+            a.setTarget(first);first.setPos(first.position().add(200,0,0));
+            NaiwaGameplay.clearMobTargets(List.of(first,second));
+            h.assertTrue(a.getTarget()==first,"远距离回退不扩大原保护范围");h.succeed();
+        } finally {
+            for(var p:List.of(first,second,other)) {NaiwaPranks.cancel(p);NaiwaGameplay.cleanup(p);NaiwaShieldTests.remove(p);}
+            a.discard();b.discard();c.discard();unrelated.discard();
+        }
+    }
+
+    /** 连续受阻时只复用几何，原地拆墙后同次重试必须成功，不增加出场等待。 */
+    @GameTest(template="empty",timeoutTicks=30)
+    public static void mockGeometryReuseStillChecksChangedBlocks(GameTestHelper h) {
+        var p=miningPlayer(h);p.setYRot(0);
+        BlockPos base=p.blockPosition();
+        try {
+            for(int x=-1;x<=1;x++)for(int z=2;z<=5;z++)for(int y=-1;y<=3;y++)h.getLevel().setBlock(base.offset(x,y,z),Blocks.STONE.defaultBlockState(),2);
+            h.assertTrue(!NaiwaPranks.mock(p)&&!NaiwaPranks.mock(p),"同一位置受阻可连续重试");
+            for(int x=-1;x<=1;x++)for(int z=2;z<=5;z++)for(int y=0;y<=3;y++)h.getLevel().setBlock(base.offset(x,y,z),Blocks.AIR.defaultBlockState(),2);
+            h.assertTrue(NaiwaPranks.mock(p),"原地移除障碍后立即出场，不复用失败结果");h.succeed();
+        } finally {NaiwaPranks.cancel(p);NaiwaGameplay.cleanup(p);NaiwaShieldTests.remove(p);}
+    }
+
+    /** 归属提示不能替代实例身份；取消一名玩家、重复清理及同玩家换场不能影响其他演员。 */
+    @GameTest(template="empty",timeoutTicks=30)
+    public static void actorLookupChecksCurrentSceneInstance(GameTestHelper h) {
+        ServerPlayer first=player(h),second=player(h);second.setPos(first.position().add(6,0,0));
+        try {
+            var ordinary=Naiwa.ENTITY.get().create(h.getLevel());
+            h.assertTrue(!NaiwaPranks.isActor(ordinary),"普通奶蛙没有场景身份");
+            h.assertTrue(NaiwaPranks.mock(first),"第一名玩家建立嘲笑场景");var old=actor(first);
+            h.assertTrue(NaiwaPranks.isActor(old),"不走 begin 的嘲笑场景也有演员身份");
+            h.assertTrue(NaiwaPranks.mock(second),"第二名玩家建立独立场景");
+            var other=totemActors(second).stream().filter(f->second.getUUID().equals(f.prankOwner)).findFirst().orElseThrow();
+            ordinary.setUUID(old.getUUID());ordinary.prankOwner=first.getUUID();
+            h.assertTrue(!NaiwaPranks.isActor(ordinary),"相同实体 UUID 和归属提示仍不能冒充当前实例");
+            old.discard();
+            h.assertTrue(NaiwaPranks.isActor(old),"实际场景清理前仍按场景实例识别，不提前按存活状态改规则");
+            NaiwaPranks.cancel(first);NaiwaPranks.cancel(first);
+            h.assertTrue(!NaiwaPranks.isActor(old)&&NaiwaPranks.isActor(other),"重复取消只释放本玩家身份");
+            h.assertTrue(NaiwaPranks.mock(first),"同玩家可以建立下一场嘲笑");
+            var current=totemActors(first).stream().filter(f->first.getUUID().equals(f.prankOwner)).findFirst().orElseThrow();
+            h.assertTrue(NaiwaPranks.isActor(current)&&!NaiwaPranks.isActor(old),"旧演员提示不能指向新场景身份");
+            NaiwaPranks.cancel(first);NaiwaPranks.cancel(second);
+            h.assertTrue(!NaiwaPranks.isActor(current)&&!NaiwaPranks.isActor(other),"全部清理后无身份残留");
+            h.succeed();
+        } finally {
+            NaiwaPranks.cancel(first);NaiwaPranks.cancel(second);NaiwaGameplay.cleanup(first);NaiwaGameplay.cleanup(second);
+            NaiwaShieldTests.remove(first);NaiwaShieldTests.remove(second);
+        }
+    }
+
+    /** 活动诱饵与同 UUID 的加载副本必须区分，取消后仍由既有结算入口恰好返还一次。 */
+    @GameTest(template="empty",timeoutTicks=30)
+    public static void decoyLookupKeepsRefundAndReloadIdentity(GameTestHelper h) {
+        ServerPlayer p=extraPlayer(h);
+        try {
+            var bait=mineDiamond(h,p);
+            h.assertTrue(NaiwaPranks.isDecoyActive(bait),"真实钻石场景登记诱饵");
+            var tag=new net.minecraft.nbt.CompoundTag();bait.saveWithoutId(tag);
+            var loaded=Naiwa.DECOY.get().create(h.getLevel());loaded.load(tag);
+            h.assertTrue(loaded.prankOwner==null&&!NaiwaPranks.isDecoyActive(loaded),"重载不恢复归属或活动场景");
+            loaded.prankOwner=p.getUUID();
+            h.assertTrue(!NaiwaPranks.isDecoyActive(loaded),"同实体 UUID 加相同提示也不能冒充活动诱饵");
+            NaiwaPranks.cancel(p);NaiwaPranks.cancel(p);bait.finishAt(bait.position());
+            h.assertTrue(!NaiwaPranks.isDecoyActive(bait)&&looseDiamonds(p)==1,"取消和重复清理只交还一颗真实钻石");
+            h.assertTrue(NaiwaPranks.mock(p),"随后可开始无诱饵场景");
+            h.assertTrue(!NaiwaPranks.isDecoyActive(bait),"旧诱饵不能借新场景保留身份");
+            h.succeed();
+        } finally {NaiwaPranks.cancel(p);NaiwaGameplay.cleanup(p);NaiwaShieldTests.remove(p);}
+    }
+
     private static List<NaiwaEntity> totemActors(ServerPlayer p) {
         return p.level().getEntitiesOfClass(NaiwaEntity.class,p.getBoundingBox().inflate(12),f->f.isAlive()&&f.isTemporary());
     }
@@ -146,15 +246,29 @@ public final class NaiwaGameplayTests {
     @GameTest(template="empty",timeoutTicks=50)
     public static void autoSceneGasBelongsToOwnerAtSixBlocks(GameTestHelper h) {
         ServerPlayer p=player(h),other=NaiwaShieldTests.player(h);p.getInventory().setItem(22,new ItemStack(Items.GLASS_BOTTLE,3));
-        double old=NaiwaConfig.RESPAWN_APPEAR_DISTANCE.get();
-        try {NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(6.0);h.assertTrue(NaiwaPranks.mock(p),"创建六格外真实所属嘲笑场景");}
-        finally {NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(old);}
-        var frog=totemActors(p).getFirst();other.setPos(frog.position().add(1,0,0));other.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.GLASS_BOTTLE));
+        h.assertTrue(NaiwaPranks.mock(p),"创建固定三格所属嘲笑场景");
+        var frog=totemActors(p).getFirst();p.setPos(frog.position().add(0,0,-6));other.setPos(frog.position().add(1,0,0));other.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.GLASS_BOTTLE));
         h.runAfterDelay(25,()->{
             try {h.assertTrue(frog.distanceToSqr(p)>9&&p.getInventory().countItem(Naiwa.GAS.get())==1,"不用赶到三格内也给本轮触发者自动结算");
                 h.assertTrue(other.getMainHandItem().is(Items.GLASS_BOTTLE)&&other.getInventory().countItem(Naiwa.GAS.get())==0,"更近的路人不会自动抢走所属奖励");h.succeed();}
             finally {NaiwaPranks.cancel(p);NaiwaGameplay.cleanup(p);NaiwaShieldTests.remove(p);NaiwaShieldTests.remove(other);}
         });
+    }
+
+    /** 新模型晚于旧版 170 tick 收场，演员、采气窗口与最终清理必须一并延长。 */
+    @GameTest(template="empty",timeoutTicks=220)
+    public static void longerLaughterKeepsActorAndLateCollection(GameTestHelper h) {
+        ServerPlayer p=player(h);h.assertTrue(NaiwaPranks.mock(p),"安全位置创建所属嘲笑场景");
+        var frog=totemActors(p).getFirst();
+        h.runAfterDelay(172,()->{
+            h.assertTrue(frog.isAlive()&&frog.clip(0).name().equals("laugh"),"经过旧版收场时刻仍保留演员及大笑末段");
+            p.getInventory().setItem(22,new ItemStack(Items.GLASS_BOTTLE));
+        });
+        h.runAfterDelay(182,()->{
+            h.assertTrue(p.getInventory().countItem(Naiwa.GAS.get())==1,"延长的大笑窗口中补瓶仍只自动兑换一次");
+            h.assertTrue(frog.isAlive()&&frog.clip(0).name().equals("laugh_exit"),"完整恢复片段结束前不得清理演员");
+        });
+        h.runAfterDelay(200,()->done(h,p,()->h.assertTrue(!frog.isAlive()&&!NaiwaPranks.busy(p),"新模型完整演出结束后正常清理场景")));
     }
 
     @GameTest(template="empty",timeoutTicks=100)
@@ -174,17 +288,20 @@ public final class NaiwaGameplayTests {
     }
 
     @GameTest(template="empty",timeoutTicks=30)
-    public static void shapelessRecipeReturnsOneEmptyBottle(GameTestHelper h) {
-        ServerPlayer p=player(h);
-        done(h,p,()->{
-            var input=CraftingInput.of(2,2,List.of(new ItemStack(Naiwa.GAS.get()),ItemStack.EMPTY,new ItemStack(Items.TOTEM_OF_UNDYING),ItemStack.EMPTY));
-            var holder=h.getLevel().getRecipeManager().getRecipeFor(RecipeType.CRAFTING,input,h.getLevel()).orElseThrow();
-            var recipe=holder.value(); ItemStack result=recipe.assemble(input,h.getLevel().registryAccess());
-            h.assertTrue(result.is(Naiwa.TOTEM.get()) && result.getCount()==1,"无序配方产出一个奶蛙图腾");
-            var remains=recipe.getRemainingItems(input);
-            h.assertTrue(remains.stream().mapToInt(s->s.is(Items.GLASS_BOTTLE)?s.getCount():0).sum()==1,"每份只返还一个空瓶");
-            h.assertTrue(input.items().stream().filter(s->!s.isEmpty()).allMatch(s->s.getCount()==1),"预览与余料查询不修改输入");
-        });
+    public static void shapedLayoutsReturnOneEmptyBottle(GameTestHelper h) {
+        // 穷举 2×2 与 3×3 的两材料摆法，覆盖有序布局的平移和水平镜像及原版余料结算。
+        for(int size:new int[]{2,3})for(int gas=0;gas<size*size;gas++)for(int totem=0;totem<size*size;totem++)if(gas!=totem) {
+            var stacks=new java.util.ArrayList<ItemStack>(java.util.Collections.nCopies(size*size,ItemStack.EMPTY));
+            stacks.set(gas,new ItemStack(Naiwa.GAS.get()));stacks.set(totem,new ItemStack(Items.TOTEM_OF_UNDYING));
+            var input=CraftingInput.of(size,size,stacks);
+            var recipe=h.getLevel().getRecipeManager().getRecipeFor(RecipeType.CRAFTING,input,h.getLevel()).orElseThrow().value();
+            h.assertTrue(recipe instanceof net.minecraft.world.item.crafting.ShapedRecipe,"使用有序布局");
+            ItemStack result=recipe.assemble(input,h.getLevel().registryAccess());
+            h.assertTrue(result.is(Naiwa.TOTEM.get())&&result.getCount()==1,"产出一个图腾");
+            h.assertTrue(recipe.getRemainingItems(input).stream().mapToInt(s->s.is(Items.GLASS_BOTTLE)?s.getCount():0).sum()==1,"每份恰返一个空瓶");
+            h.assertTrue(input.items().stream().filter(s->!s.isEmpty()).allMatch(s->s.getCount()==1),"预览不修改输入");
+        }
+        h.succeed();
     }
 
     @GameTest(template="empty",timeoutTicks=80)
@@ -300,7 +417,7 @@ public final class NaiwaGameplayTests {
         h.runAfterDelay(250,()->{
             h.assertTrue(totemActors(p).size()==1&&!NaiwaGameplay.waitingForTotemLanding(p),"落地后只消费一次待办并生成一个演员");
             NaiwaEntity frog=totemActors(p).getFirst();Vec3 delta=frog.position().subtract(p.position()).multiply(1,0,1);
-            h.assertTrue(Math.abs(delta.length()-2.5)<.01&&delta.normalize().dot(Vec3.directionFromRotation(0,p.getYRot()))>.999,"使用落地后的当前位置和水平朝向，严格位于正前方");
+            h.assertTrue(Math.abs(delta.length()-3)<.01&&delta.normalize().dot(Vec3.directionFromRotation(0,p.getYRot()))>.999,"使用落地后的当前位置和水平朝向，严格位于正前方");
             h.assertTrue(frog.animation().equals("laugh_sequence")&&Math.abs(net.minecraft.util.Mth.wrapDegrees(frog.getYRot()-p.getYRot()-180))<.01,"正面朝向玩家播放完整大笑");
             h.assertTrue(resident.position().distanceToSqr(residentPosition)<.001&&resident.getMainHandItem()==prop&&resident.animation().equals("auto"),"不挪用侧面的常驻奶蛙，也不改它的物品和动作");
         });
@@ -469,6 +586,28 @@ public final class NaiwaGameplayTests {
             h.assertTrue(frog.animation().equals("laugh_sequence"),"第二次突然重开抓现行后完整大笑");
             h.assertTrue(h.getLevel().getBlockState(door).getValue(DoorBlock.OPEN),"整蛊不改真实门状态");
         }));
+    }
+
+    /** 关门等待不能提前笑或采气；以真实方块状态裁定三秒到期。 */
+    @GameTest(template="empty",timeoutTicks=90)
+    public static void closedDoorWaitsThreeSecondsThenLeaves(GameTestHelper h) {
+        ServerPlayer p=player(h);BlockPos door=p.blockPosition().offset(0,0,2);
+        var state=Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.OPEN,true);
+        h.getLevel().setBlock(door,state,2);h.getLevel().setBlock(door.above(),state.setValue(DoorBlock.HALF,DoubleBlockHalf.UPPER),2);
+        h.assertTrue(NaiwaPranks.startBlock(p,"door",door),"建立门场景");var frog=actor(p);
+        h.runAfterDelay(5,()->h.getLevel().setBlock(door,state.setValue(DoorBlock.OPEN,false),2));
+        h.runAfterDelay(40,()->h.assertTrue(frog.isAlive()&&!frog.animation().equals("laugh_sequence")&&!frog.animation().equals("laugh_enter"),"关门等待保持严肃"));
+        h.runAfterDelay(70,()->done(h,p,()->h.assertTrue(!frog.isAlive()&&!NaiwaPranks.busy(p),"关门三秒后离场")));
+    }
+
+    @GameTest(template="empty",timeoutTicks=80)
+    public static void openDoorLaughsAfterThreeSeconds(GameTestHelper h) {
+        ServerPlayer p=player(h);BlockPos door=p.blockPosition().offset(0,0,2);
+        var state=Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.OPEN,true);
+        h.getLevel().setBlock(door,state,2);h.getLevel().setBlock(door.above(),state.setValue(DoorBlock.HALF,DoubleBlockHalf.UPPER),2);
+        h.assertTrue(NaiwaPranks.startBlock(p,"door",door),"建立门场景");var frog=actor(p);
+        h.runAfterDelay(55,()->h.assertTrue(!frog.animation().equals("laugh_sequence"),"三秒前不提前笑"));
+        h.runAfterDelay(65,()->done(h,p,()->h.assertTrue(frog.animation().equals("laugh_sequence"),"三秒未关门则完整大笑")));
     }
 
     @GameTest(template="empty",timeoutTicks=65)
@@ -902,7 +1041,7 @@ public final class NaiwaGameplayTests {
             h.assertTrue(!fresh.getPersistentData().getBoolean("naiwa.respawn_mock"),"新玩家实例消费待触发事件");
             h.assertTrue(totemActors(fresh).size()==1,"复活后只生成一个临时嘲笑演员");
             NaiwaEntity frog=totemActors(fresh).getFirst();Vec3 delta=frog.position().subtract(fresh.position()).multiply(1,0,1);
-            h.assertTrue(Math.abs(delta.length()-2.5)<.01&&delta.normalize().dot(Vec3.directionFromRotation(0,fresh.getYRot()))>.999,"按新玩家当前落点和水平朝向正前方出场，不使用死亡点、旧床朝向或侧面常驻奶蛙");
+            h.assertTrue(Math.abs(delta.length()-3)<.01&&delta.normalize().dot(Vec3.directionFromRotation(0,fresh.getYRot()))>.999,"按新玩家当前落点和水平朝向正前方出场，不使用死亡点、旧床朝向或侧面常驻奶蛙");
             h.assertTrue(frog.animation().equals("laugh_sequence")&&Math.abs(net.minecraft.util.Mth.wrapDegrees(frog.getYRot()-fresh.getYRot()-180))<.01,"面向复活玩家播放完整大笑");
             h.assertTrue(resident.position().distanceToSqr(residentPosition)<.001&&resident.animation().equals("auto")&&resident.getMainHandItem()==prop,"常驻奶蛙的位置、动作及物品不变");
         });
@@ -972,13 +1111,13 @@ public final class NaiwaGameplayTests {
         }));
     }
 
-    @GameTest(template="empty",timeoutTicks=210)
+    @GameTest(template="empty",timeoutTicks=235)
     public static void nearbyFrogsReserveOneShieldConversion(GameTestHelper h) {
         ServerPlayer p=player(h);var first=h.spawn(Naiwa.ENTITY.get(),2,3,5);var second=h.spawn(Naiwa.ENTITY.get(),4,3,5);
         first.setNoAi(true);first.setNoGravity(true);second.setNoAi(true);second.setNoGravity(true);
         p.setItemInHand(InteractionHand.OFF_HAND,new ItemStack(Items.SHIELD));
         h.runAfterDelay(25,()->h.assertTrue(first.animation().equals("laugh_sequence")!=second.animation().equals("laugh_sequence"),"两只本体只能有一只为同一玩家启动转化"));
-        h.runAfterDelay(185,()->done(h,p,()->h.assertTrue(p.getOffhandItem().is(Naiwa.SHIELD.get()),"竞争结束后仍只原位交付一面奶蛙盾")));
+        h.runAfterDelay(210,()->done(h,p,()->h.assertTrue(p.getOffhandItem().is(Naiwa.SHIELD.get()),"竞争结束后仍只原位交付一面奶蛙盾")));
     }
 
     private static ServerPlayer extraPlayer(GameTestHelper h) {
@@ -1024,16 +1163,18 @@ public final class NaiwaGameplayTests {
     }
     private static int looseDiamonds(ServerPlayer p) {return p.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,p.getBoundingBox().inflate(12),e->e.getItem().is(Items.DIAMOND)).stream().mapToInt(e->e.getItem().getCount()).sum();}
 
-    @GameTest(template="empty",timeoutTicks=270)
-    public static void minedDiamondMovesTwiceAndReturnsAfterActorDisappears(GameTestHelper h) {
+    @GameTest(template="empty",timeoutTicks=350)
+    public static void minedDiamondAvoidsForFourSecondsAndReturnsAfterActorDisappears(GameTestHelper h) {
         ServerPlayer p=extraPlayer(h);NaiwaDecoy bait=mineDiamond(h,p);Vec3 first=bait.position();
         h.assertTrue(p.level().getEntitiesOfClass(NaiwaEntity.class,p.getBoundingBox().inflate(12),NaiwaEntity::isTemporary).isEmpty(),"追逐前不提前暴露奶蛙");
         p.setPos(first.add(0,0,-1.4));
-        h.runAfterDelay(15,()->{h.assertTrue(Math.abs(bait.getZ()-first.z-1.3)<.05,"第一次只后退一小段");p.setPos(bait.position().add(0,0,-1.4));});
-        h.runAfterDelay(32,()->face(p,actor(p).getEyePosition()));
+        h.runAfterDelay(15,()->{h.assertTrue(bait.position().subtract(p.position()).horizontalDistance()>=4,"避让到四格外");p.setPos(bait.position().add(0,0,-1.4));});
+        h.runAfterDelay(35,()->{h.assertTrue(bait.position().subtract(p.position()).horizontalDistance()>=4,"再次接近继续避让");bait.interact(p,InteractionHand.MAIN_HAND);h.assertTrue(!bait.exposed(),"窗口内交互不能提前识破");});
+        h.runAfterDelay(70,()->h.assertTrue(p.level().getEntitiesOfClass(NaiwaEntity.class,p.getBoundingBox().inflate(12),NaiwaEntity::isTemporary).isEmpty(),"四秒前不现身"));
+        h.runAfterDelay(86,()->face(p,actor(p).getEyePosition()));
         var endpoint=new Vec3[1];
-        h.runAfterDelay(55,()->{h.assertTrue(actor(p).animation().equals("laugh_sequence")&&bait.isAlive()&&bait.isInvisible(),"露馅大笑时只隐藏诱饵，真实钻石继续暂存");endpoint[0]=actor(p).position();h.assertTrue(looseDiamonds(p)==0&&p.getInventory().countItem(Items.DIAMOND)==0,"大笑期间不能提前拿到钻石");});
-        h.runAfterDelay(240,()->done(h,p,()->{
+        h.runAfterDelay(105,()->{h.assertTrue(actor(p).animation().equals("laugh_sequence")&&bait.isAlive()&&bait.isInvisible(),"露馅大笑时只隐藏诱饵，真实钻石继续暂存");endpoint[0]=actor(p).position();h.assertTrue(looseDiamonds(p)==0&&p.getInventory().countItem(Items.DIAMOND)==0,"大笑期间不能提前拿到钻石");});
+        h.runAfterDelay(320,()->done(h,p,()->{
             h.assertTrue(!bait.isAlive()&&!NaiwaPranks.busy(p)&&looseDiamonds(p)==1,"奶蛙消失后恰好交还原来一颗钻石");
             var drop=p.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,p.getBoundingBox().inflate(12),e->e.getItem().is(Items.DIAMOND)).getFirst();
             h.assertTrue(drop.position().subtract(endpoint[0]).horizontalDistance()<.01,"返还钻石应原地落下，不随机抛离消失点："+drop.position()+" endpoint="+endpoint[0]);
@@ -1078,7 +1219,9 @@ public final class NaiwaGameplayTests {
         done(h,p,()->{
             h.assertTrue(rolled[0]>=1&&looseDiamonds(p)==0,"时运已经由原版计算，整蛊期间没有真实掉落");NaiwaPranks.cancel(p);
             h.assertTrue(looseDiamonds(p)==rolled[0]&&tool.getDamageValue()==1,"原数交还本次时运结果，不重新抽取或多扣耐久");
-            int xp=p.level().getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class,p.getBoundingBox().inflate(12)).stream().mapToInt(net.minecraft.world.entity.ExperienceOrb::getValue).sum();
+            // 原版可能在生成时就合并同面值经验球；Value 是单份经验，Count 才是合并份数。
+            int xp=p.level().getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class,p.getBoundingBox().inflate(12)).stream()
+                    .mapToInt(orb->orb.getValue()*orb.saveWithoutId(new net.minecraft.nbt.CompoundTag()).getInt("Count")).sum();
             h.assertTrue(xp==rolled[1],"原版开采经验不被暂存或重复发放");
         });
     }
@@ -1170,12 +1313,12 @@ public final class NaiwaGameplayTests {
     @GameTest(template="empty",timeoutTicks=80)
     public static void spyglassUseCreatesTemporaryActorAndReleaseLaughs(GameTestHelper h) {
         ServerPlayer p=extraPlayer(h);p.setYRot(0);p.setXRot(0);
-        h.assertTrue(!NaiwaPranks.startScope(p,8),"没用望远镜不能出场");p.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.SPYGLASS));p.startUsingItem(InteractionHand.MAIN_HAND);
-        h.assertTrue(NaiwaPranks.startScope(p,8),"周围没有常驻奶蛙也可直接触发");NaiwaEntity frog=actor(p);
-        h.assertTrue(frog.isTemporary()&&Math.abs(frog.getZ()-p.getZ()-8)<.001&&!NaiwaPranks.startScope(p,8),"按镜内距离临时出场，重复申请不复制演员");
+        h.assertTrue(!NaiwaPranks.startScope(p,4),"没用望远镜不能出场");p.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.SPYGLASS));p.startUsingItem(InteractionHand.MAIN_HAND);
+        h.assertTrue(NaiwaPranks.startScope(p,4),"周围没有常驻奶蛙也可直接触发");NaiwaEntity frog=actor(p);
+        h.assertTrue(frog.isTemporary()&&frog.scopeViewer()==p.getId()&&Math.abs(frog.getZ()-p.getZ()-4)<.001&&!NaiwaPranks.startScope(p,4),"按镜内距离临时出场，重复申请不复制演员");
         h.runAfterDelay(8,()->{h.assertTrue(!frog.animation().equals("laugh_sequence"),"镜筒未放下不能直接大笑");p.stopUsingItem();face(p,frog.getEyePosition());});
         h.runAfterDelay(35,()->done(h,p,()->{
-            h.assertTrue(frog.animation().equals("laugh_sequence")&&frog.isTemporary(),"放下后看到临时演员才笑");NaiwaPranks.cancel(p);
+            h.assertTrue(frog.animation().equals("laugh_sequence")&&frog.isTemporary()&&frog.scopeViewer()==-1,"放下撤图后看到临时演员才笑");NaiwaPranks.cancel(p);
             h.assertTrue(!frog.isAlive(),"结束直接清除临时演员");
         }));
     }
@@ -1207,7 +1350,6 @@ public final class NaiwaGameplayTests {
             h.assertTrue(NaiwaConfig.nextIntervalTicks(random)==1728000,"一天上限不会溢出");
             var config=com.electronwill.nightconfig.core.CommentedConfig.inMemory();
             config.set("prankIntervalMinSeconds",-1);config.set("prankIntervalMaxSeconds",600);config.set("allowConsecutiveSamePrank",false);
-            config.set("respawnAppearDistance",2.5);config.set("totemLandingAppearDistance",2.5);
             h.assertTrue(!NaiwaConfig.SPEC.isCorrect(config),"配置边界拒绝负数");config.set("prankIntervalMinSeconds",86401);
             h.assertTrue(!NaiwaConfig.SPEC.isCorrect(config),"配置边界拒绝超出一天");h.succeed();
         } finally {
@@ -1217,68 +1359,37 @@ public final class NaiwaGameplayTests {
     }
 
     @GameTest(template="empty",timeoutTicks=20)
-    public static void appearanceDistanceConfigUpgradesOldFilesAndRejectsInvalidValues(GameTestHelper h) {
+    public static void settingsDropRetiredDistancesWithoutChangingSchedule(GameTestHelper h) {
         var config=com.electronwill.nightconfig.core.CommentedConfig.inMemory();
         config.set("prankIntervalMinSeconds",17);config.set("prankIntervalMaxSeconds",29);config.set("allowConsecutiveSamePrank",true);
+        config.set("respawnAppearDistance",6.0);config.set("totemLandingAppearDistance",8.0);
         NaiwaConfig.SPEC.correct(config);
-        h.assertTrue(NaiwaConfig.SPEC.isCorrect(config)&&((Number)config.get("respawnAppearDistance")).doubleValue()==2.5
-                &&((Number)config.get("totemLandingAppearDistance")).doubleValue()==2.5,"旧配置自动补齐两个默认距离");
+        h.assertTrue(NaiwaConfig.SPEC.isCorrect(config)&&config.valueMap().size()==3,"旧配置校正后只保留三项");
         h.assertTrue(((Number)config.get("prankIntervalMinSeconds")).intValue()==17&&((Number)config.get("prankIntervalMaxSeconds")).intValue()==29
-                &&Boolean.TRUE.equals(config.get("allowConsecutiveSamePrank")),"补齐设置不改已有间隔和连续触发选项");
-        for(double valid:new double[]{1.5,2.5,4.25,16}) {
-            config.set("respawnAppearDistance",valid);config.set("totemLandingAppearDistance",valid);
-            h.assertTrue(NaiwaConfig.SPEC.isCorrect(config),"边界值和小数距离合法："+valid);
-        }
-        for(double invalid:new double[]{0,1.49,16.01,Double.NaN,Double.POSITIVE_INFINITY,Double.NEGATIVE_INFINITY}) {
-            config.set("respawnAppearDistance",invalid);config.set("totemLandingAppearDistance",2.5);
-            h.assertTrue(!NaiwaConfig.SPEC.isCorrect(config),"复活距离拒绝越界或非有限值："+invalid);
-            config.set("respawnAppearDistance",2.5);config.set("totemLandingAppearDistance",invalid);
-            h.assertTrue(!NaiwaConfig.SPEC.isCorrect(config),"图腾距离拒绝越界或非有限值："+invalid);
-        }
-        config.set("respawnAppearDistance","bad");NaiwaConfig.SPEC.correct(config);
-        h.assertTrue(NaiwaConfig.SPEC.isCorrect(config),"非法类型及非法数值均能由原生配置系统修正");h.succeed();
+                &&Boolean.TRUE.equals(config.get("allowConsecutiveSamePrank")),"保留原间隔和重复选项");
+        h.succeed();
     }
 
-    /** 改值、出场和恢复在同一服务端调用完成，不让并行场景读到专项距离。 */
+    /** 固定三格出场仍复查障碍，且不能绕过真实落地条件。 */
     @GameTest(template="empty",timeoutTicks=20)
-    public static void separateAppearanceDistancesDriveRealActorsAndKeepActiveSceneFixed(GameTestHelper h) {
-        double respawn=NaiwaConfig.RESPAWN_APPEAR_DISTANCE.get(),totem=NaiwaConfig.TOTEM_LANDING_APPEAR_DISTANCE.get();ServerPlayer p=player(h);
+    public static void fixedThreeBlockMockWaitsWhenBlocked(GameTestHelper h) {
+        ServerPlayer p=player(h);p.setYRot(0);
         try {
-            h.assertTrue(respawn==2.5&&totem==2.5,"默认保留原优先出场距离");
-            NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(6.0);NaiwaConfig.TOTEM_LANDING_APPEAR_DISTANCE.set(4.25);
-            h.assertTrue(NaiwaPranks.mock(p),"复活距离设置能实际生成演员");NaiwaEntity frog=totemActors(p).getFirst();
-            h.assertTrue(Math.abs(frog.position().subtract(p.position()).horizontalDistance()-6)<.001,"复活使用独立六格设置");
-            NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(8.0);
-            h.assertTrue(Math.abs(frog.position().subtract(p.position()).horizontalDistance()-6)<.001,"改距离不挪动正在演出的演员");
-            NaiwaPranks.cancel(p);h.assertTrue(NaiwaPranks.mock(p),"后续复活出场读取新值");
-            h.assertTrue(Math.abs(totemActors(p).getFirst().position().subtract(p.position()).horizontalDistance()-8)<.001,"新演员使用八格设置");NaiwaPranks.cancel(p);
-            p.setOnGround(true);h.assertTrue(NaiwaPranks.mockAfterTotemLanding(p),"图腾真正落地后按距离设置出场");
-            h.assertTrue(Math.abs(totemActors(p).getFirst().position().subtract(p.position()).horizontalDistance()-4.25)<.001,"图腾独立使用四点二五格，不误读复活距离");NaiwaPranks.cancel(p);
-            p.setOnGround(false);h.assertTrue(!NaiwaPranks.mockAfterTotemLanding(p),"自定义距离不能绕过图腾落地条件");
-            NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(5.25);BlockPos obstacle=BlockPos.containing(p.position().add(0,0,5.25));
-            // 一点五格高的栅栏挡住演员身体，但视线可从上方通过；实心高墙会正确拒绝其后的所有候选。
-            h.getLevel().setBlock(obstacle,Blocks.OAK_FENCE.defaultBlockState(),2);
-            h.assertTrue(NaiwaPranks.mock(p),"自定义距离受阻后可沿正前方增加一格");
-            h.assertTrue(Math.abs(totemActors(p).getFirst().position().subtract(p.position()).horizontalDistance()-6.25)<.001,"不回退到固定默认距离");NaiwaPranks.cancel(p);
-            h.getLevel().setBlock(obstacle,Blocks.AIR.defaultBlockState(),2);h.getLevel().setBlock(obstacle.above(),Blocks.AIR.defaultBlockState(),2);
-            // 斜向十六格落在本测试结构角内，不依赖或修改相邻测试区域。
-            p.setYRot(-45);Vec3 expected=p.position().add(Vec3.directionFromRotation(0,p.getYRot()).scale(16));BlockPos target=BlockPos.containing(expected);
-            for(int x=-1;x<=1;x++)for(int z=-1;z<=1;z++)h.getLevel().setBlock(target.below().offset(x,0,z),Blocks.STONE.defaultBlockState(),2);
-            NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(16.0);h.assertTrue(NaiwaPranks.mock(p),"十六格上限可生成真实演员");
-            var actors=p.level().getEntitiesOfClass(NaiwaEntity.class,net.minecraft.world.phys.AABB.ofSize(expected.add(0,1,0),1,2,1),f->f.isAlive()&&f.isTemporary());
-            h.assertTrue(actors.size()==1&&Math.abs(actors.getFirst().position().subtract(p.position()).horizontalDistance()-16)<.001,"上限距离准确");NaiwaPranks.cancel(p);
-            h.getLevel().setBlock(target,Blocks.OAK_FENCE.defaultBlockState(),2);
-            h.assertTrue(!NaiwaPranks.mock(p),"上限处受阻不能继续向十七或十八格生成");h.succeed();
-        } finally {
-            NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(respawn);NaiwaConfig.TOTEM_LANDING_APPEAR_DISTANCE.set(totem);
-            NaiwaPranks.cancel(p);NaiwaGameplay.cleanup(p);NaiwaShieldTests.remove(p);
-        }
+            h.assertTrue(NaiwaPranks.mock(p),"复活正前方可出场");
+            h.assertTrue(Math.abs(totemActors(p).getFirst().position().subtract(p.position()).horizontalDistance()-3)<.001,"固定三格");
+            NaiwaPranks.cancel(p);p.setOnGround(true);
+            h.assertTrue(NaiwaPranks.mockAfterTotemLanding(p),"真正落地可出场");NaiwaPranks.cancel(p);
+            p.setOnGround(false);h.assertTrue(!NaiwaPranks.mockAfterTotemLanding(p),"空中不能嘲笑");
+            BlockPos blocked=p.blockPosition().offset(0,0,3);
+            for(int y=0;y<4;y++)h.getLevel().setBlock(blocked.above(y),Blocks.STONE.defaultBlockState(),2);
+            h.assertTrue(!NaiwaPranks.mock(p),"三格处受阻不退到四格或五格");h.succeed();
+        } finally {NaiwaPranks.cancel(p);NaiwaGameplay.cleanup(p);NaiwaShieldTests.remove(p);}
     }
 
     @GameTest(template="empty",timeoutTicks=45)
     public static void spyglassLookAwayCancelsWithoutDuplicate(GameTestHelper h) {
-        ServerPlayer p=extraPlayer(h);p.setYRot(0);p.setXRot(0);p.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.SPYGLASS));p.startUsingItem(InteractionHand.MAIN_HAND);h.assertTrue(NaiwaPranks.startScope(p,8),"开始贴脸");NaiwaEntity frog=actor(p);
-        h.runAfterDelay(5,()->p.setYRot(180));
+        ServerPlayer p=extraPlayer(h);p.setYRot(0);p.setXRot(0);p.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.SPYGLASS));p.startUsingItem(InteractionHand.MAIN_HAND);h.assertTrue(NaiwaPranks.startScope(p,4),"开始贴脸");NaiwaEntity frog=actor(p);
+        h.runAfterDelay(5,()->{p.stopUsingItem();p.setYRot(180);});
         h.runAfterDelay(12,()->done(h,p,()->{
             h.assertTrue(!NaiwaPranks.busy(p)&&!frog.isAlive()&&p.getYRot()==180,"转头清除演员，不强制扭转玩家视角");
             h.assertTrue(p.level().getEntitiesOfClass(NaiwaEntity.class,p.getBoundingBox().inflate(12),NaiwaEntity::isAlive).isEmpty(),"没有演员残留");p.stopUsingItem();
@@ -1311,7 +1422,8 @@ public final class NaiwaGameplayTests {
     public static void fakeDiamondCannotBePickedUpOrHopperCollected(GameTestHelper h) {
         ServerPlayer p=extraPlayer(h);NaiwaDecoy bait=mineDiamond(h,p);ServerPlayer collector=player(h);BlockPos pos=BlockPos.containing(bait.position()).below();h.getLevel().setBlock(pos,Blocks.HOPPER.defaultBlockState(),3);
         var hopper=(net.minecraft.world.level.block.entity.HopperBlockEntity)p.level().getBlockEntity(pos);
-        collector.setPos(bait.position());
+        // 保持主人在避让范围外，独立验证漏斗与路人不能取物，不触发离开非完整漏斗地面的路线检查。
+        p.setPos(bait.position().add(0,0,-6));collector.setPos(bait.position());
         h.runAfterDelay(40,()->done(h,p,()->{
             try{h.assertTrue(bait.isAlive()&&hopper.isEmpty()&&collector.getInventory().countItem(Items.DIAMOND)==0&&looseDiamonds(p)==0,"原版漏斗 tick 和另一玩家接触均取不到暂存钻石");}finally{NaiwaShieldTests.remove(collector);}
         }));
@@ -1319,9 +1431,9 @@ public final class NaiwaGameplayTests {
 
     @GameTest(template="empty",timeoutTicks=20)
     public static void spyglassRefusesOccupiedActorSpaceAndInvalidDistance(GameTestHelper h) {
-        ServerPlayer p=extraPlayer(h);p.setYRot(0);p.setXRot(0);h.getLevel().setBlock(BlockPos.containing(p.position().add(0,0,8)),Blocks.STONE.defaultBlockState(),3);
+        ServerPlayer p=extraPlayer(h);p.setYRot(0);p.setXRot(0);for(int y=0;y<5;y++)h.getLevel().setBlock(BlockPos.containing(p.position().add(0,y,4)),Blocks.STONE.defaultBlockState(),3);
         p.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.SPYGLASS));p.startUsingItem(InteractionHand.MAIN_HAND);
-        done(h,p,()->{h.assertTrue(!NaiwaPranks.startScope(p,8)&&!NaiwaPranks.startScope(p,7)&&!NaiwaPranks.startScope(p,65),"目标占用或客户端距离越界均拒绝");h.assertTrue(!NaiwaPranks.busy(p)&&p.getPersistentData().getLong("naiwa.prank_next")==0,"失败不生成演员、不消耗间隔");p.stopUsingItem();});
+        done(h,p,()->{h.assertTrue(!NaiwaPranks.startScope(p,4)&&!NaiwaPranks.startScope(p,7)&&!NaiwaPranks.startScope(p,65),"目标占用或客户端距离越界均拒绝");h.assertTrue(!NaiwaPranks.busy(p)&&p.getPersistentData().getLong("naiwa.prank_next")==0,"失败不生成演员、不消耗间隔");p.stopUsingItem();});
     }
 
     @GameTest(template="empty",timeoutTicks=20)
@@ -1329,7 +1441,7 @@ public final class NaiwaGameplayTests {
         ServerPlayer p=extraPlayer(h);NaiwaEntity original=distantFrog(h,p);original.setNoAi(false);Vec3 originalPos=original.position();original.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.IRON_PICKAXE));
         p.setYRot(0);p.setXRot(0);p.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.SPYGLASS));p.startUsingItem(InteractionHand.MAIN_HAND);
         done(h,p,()->{
-            h.assertTrue(NaiwaPranks.startScope(p,8)&&original.position().distanceToSqr(originalPos)<.001,"即使前方有常驻本体，也只生成新临时演员");
+            h.assertTrue(NaiwaPranks.startScope(p,4)&&original.position().distanceToSqr(originalPos)<.001,"即使前方有常驻本体，也只生成新临时演员");
             NaiwaPranks.cancel(p);h.assertTrue(original.isAlive()&&!original.isNoAi()&&original.getMainHandItem().is(Items.IRON_PICKAXE),"常驻本体 AI 与真实道具不受影响");p.stopUsingItem();original.discard();
         });
     }

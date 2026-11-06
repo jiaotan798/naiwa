@@ -1,5 +1,5 @@
 {
-  "sourceSha256": "5893f524bacf8d99d9e468d7f141489c010a35ca670fb81ece3a64373f2caf9d",
+  "sourceSha256": "530ab823e6f66065e52b68d9d5a24b765640945cac8e6fca12a590098c7291b9",
   "fps": 50,
   "bones": 38,
   "vertices": 3580,
@@ -43,9 +43,9 @@
     },
     {
       "name": "laugh",
-      "length": 7.04,
+      "length": 8.25,
       "loop": false,
-      "frameCount": 353
+      "frameCount": 414
     },
     {
       "name": "laugh_exit",
@@ -61,9 +61,9 @@
     },
     {
       "name": "ascend_hover",
-      "length": 3,
+      "length": 3.04,
       "loop": true,
-      "frameCount": 151
+      "frameCount": 153
     },
     {
       "name": "ascend_exit",
@@ -79,7 +79,7 @@
     "assets/naiwa/textures/entity/naiwa_3.png": "0aaa3d575e498575d58e9e6bec5385441c289b5f7e3b7868cc3da1e494a71dc3",
     "assets/naiwa/textures/entity/naiwa_4.png": "da0c3265f48b7dac28f7c6904f20821afba2b20bceaeac68d9784846cbaf1276",
     "assets/naiwa/textures/entity/naiwa_5.png": "f4e3cc68d8d9652c1561c0327e2735d1dc07b58a9f05a1927298fb9f6a2ab042",
-    "native-pose-checks.json": "00eb02b6a67925cc1607695c7e5430e0dba0308e214c83b7781789f982e5093c",
-    "assets/naiwa/models/entity/naiwa.nwm": "e92b61a34e0af2ae09fa0402b35b02e797b4195879105225e2ef675d5d0c70d6"
+    "native-pose-checks.json": "ecd6ce6ba8b501ddfa64b766b8363dd22d4b35b18ee0807d9199c74c7b988e0b",
+    "assets/naiwa/models/entity/naiwa.nwm": "f54fb82a8a2467e634b9bba69a7eac4781fbd38bc55473ebd41e2d54205b4f1a"
   }
 }

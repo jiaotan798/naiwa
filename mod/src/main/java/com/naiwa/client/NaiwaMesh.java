@@ -16,6 +16,8 @@ public final class NaiwaMesh {
     public final int[] materials, corners;
     public final Map<String, Clip> clips = new LinkedHashMap<>();
     private final float[] matrix;
+    private final float[] actionLeft, actionRight, actionLegs, actionHead;
+    final int[] headVertices;
 
     /** 只接受经过采样的有限数据，损坏资源立即报错，不能静默显示缺骨或无贴图的角色。 */
     public NaiwaMesh(InputStream source) throws IOException {
@@ -55,6 +57,22 @@ public final class NaiwaMesh {
             if (in.read() != -1) throw new IOException("奶蛙模型尾部含未识别数据");
         }
         matrix = new float[boneCount * 12];
+        boolean[] head=headFaces(),selected=new boolean[vertexCount];int selectedCount=0;
+        for(int f=0;f<faceCount;f++) if(head[f]) for(int c=0;c<3;c++)selected[corners[f*3+c]]=true;
+        for(boolean used:selected)if(used)selectedCount++;
+        headVertices=new int[selectedCount];int next=0;
+        for(int v=0;v<vertexCount;v++)if(selected[v])headVertices[next++]=v;
+        actionLeft=new float[vertexCount];actionRight=new float[vertexCount];
+        actionLegs=new float[vertexCount];actionHead=new float[vertexCount];
+        // 分区只依赖源骨号和权重，加载后不变；保持原权重累加顺序，避免改变姿态的浮点结果。
+        for(int v=0;v<vertexCount;v++) for(int j=0;j<joints[v].length;j++) {
+            int bone=joints[v][j];float weight=weights[v][j];
+            if(bone>=17&&bone<=18||handBone(bone,false)) actionLeft[v]+=weight;
+            if(bone>=21&&bone<=22||handBone(bone,true)) actionRight[v]+=weight;
+            // 36/37 是追加手指骨，不能归入腿部；换模型时需重新核对这些分区。
+            if(bone>=26&&bone<=35) actionLegs[v]+=weight;
+            if(bone>=4&&bone<=15) actionHead[v]+=weight;
+        }
     }
 
     private static int count(DataInputStream in, int max) throws IOException {
@@ -81,8 +99,36 @@ public final class NaiwaMesh {
         return selected;
     }
 
+    /** 加载时按材质分组，保留各材质内原始面序；头部仍使用同一静态颈部切面。 */
+    int[][] facesByMaterial(boolean headOnly) {
+        boolean[] head = headOnly ? headFaces() : null;
+        int[][] groups = new int[materialCount][];
+        int[] counts = new int[materialCount];
+        for (int f=0;f<faceCount;f++) if (!headOnly || head[f]) counts[materials[f]]++;
+        for (int m=0;m<materialCount;m++) groups[m]=new int[counts[m]];
+        java.util.Arrays.fill(counts,0);
+        for (int f=0;f<faceCount;f++) if (!headOnly || head[f]) groups[materials[f]][counts[materials[f]]++]=f;
+        return groups;
+    }
+
+    /** 从尚未转换到渲染坐标的姿态取右手加权中心，结果单位为格，含原有书本向外偏移。 */
+    void rightHandPosition(float[] posed, double[] result) {
+        float x=0,y=0,z=0,total=0;
+        for(int v=0;v<vertexCount;v++) for(int j=0;j<joints[v].length;j++) {
+            if(!handBone(joints[v][j],true)) continue;
+            float weight=weights[v][j];x+=posed[v*3]*weight;y+=posed[v*3+1]*weight;z+=posed[v*3+2]*weight;total+=weight;
+        }
+        if(total==0) throw new IllegalStateException("钓鱼道具缺少右手掌权重");
+        result[0]=x/total/16;result[1]=y/total/16;result[2]=z/total/16+.08;
+    }
+
     /** 50 Hz 原生矩阵之间插值，每个顶点按源文件保留的 1～4 个骨骼权重变形；输出仍用 Blockbench 单位。 */
     public void pose(String name, double seconds, float[] target, float[] targetNormals) {
+        pose(name,seconds,target,targetNormals,null);
+    }
+
+    /** 头部路径仅处理切面实际引用的顶点，仍使用完整骨矩阵与原权重，保留颈部驱动的后脑。 */
+    private void pose(String name,double seconds,float[] target,float[] targetNormals,int[] selected) {
         Clip clip = clips.get(name);
         if (clip == null) throw new IllegalArgumentException("奶蛙模型缺少动画：" + name);
         double time = clip.loop ? Math.max(0, seconds) % clip.seconds : Math.clamp(seconds, 0, clip.seconds);
@@ -93,7 +139,8 @@ public final class NaiwaMesh {
             float a = clip.matrices[first * stride + i], b = clip.matrices[(first + 1) * stride + i];
             matrix[i] = a + (b - a) * alpha;
         }
-        for (int v = 0; v < vertexCount; v++) {
+        for (int index=0;index<(selected==null?vertexCount:selected.length);index++) {
+            int v=selected==null?index:selected[index];
             int p = v * 3;
             float x = positions[p], y = positions[p+1], z = positions[p+2];
             float a=0,b=0,c=0,d=0,e=0,f=0,g=0,h=0,i=0,tx=0,ty=0,tz=0;
@@ -118,35 +165,39 @@ public final class NaiwaMesh {
     /** 手掌含追加的放松手指骨；前 36 根骨序不变，36/37 分别跟随左右手，换模型需同步核对。 */
     static boolean handBone(int bone,boolean right) {return bone==(right?23:19)||bone==(right?37:36);}
 
-    /** 原生采样之外的整蛊姿势层，不改源模型；骨号来自当前 38 骨清单，换模型需同步核对。 */
+    /** 原生采样之外的整蛊姿势层；复用加载时的骨骼分区，每次只计算一次公共动作参数。 */
     public void poseAction(String name,double seconds,float[] target,float[] targetNormals,String action,float pitch) {
-        pose(name,seconds,target,targetNormals);
+        poseAction(name,seconds,target,targetNormals,action,pitch,null);
+    }
+
+    void poseHeadAction(String name,double seconds,float[] target,float[] targetNormals,String action,float pitch) {
+        poseAction(name,seconds,target,targetNormals,action,pitch,headVertices);
+    }
+
+    private void poseAction(String name,double seconds,float[] target,float[] targetNormals,String action,float pitch,int[] selected) {
+        pose(name,seconds,target,targetNormals,selected);
         if (action.isEmpty()) return;
-        for(int v=0;v<vertexCount;v++) {
-            float left=0,right=0,legs=0,head=0;
-            for(int j=0;j<joints[v].length;j++) {
-                int bone=joints[v][j]; float weight=weights[v][j];
-                if(bone>=17&&bone<=18||handBone(bone,false)) left+=weight;
-                if(bone>=21&&bone<=22||handBone(bone,true)) right+=weight;
-                // 手指骨追加在腿骨之后，不能再用无上界的 >=26 判断腿部，否则划船会把手指转到腿上。
-                if(bone>=26&&bone<=35) legs+=weight;
-                if(bone>=4&&bone<=15) head+=weight;
-            }
-            float arms=switch(action) {
-                case "tree","tree_exposed","fish" -> -1.2F;
-                case "mine" -> (float)(-1.1+Math.sin(seconds*7)*.55);
-                case "mine_hide" -> .8F;
-                case "boat" -> (float)(-.8+Math.sin(seconds*4)*.4);
-                case "door_giggle" -> -.7F;
-                case "diamond_point" -> -1.3F;
-                case "scratch" -> -2.6F+(float)Math.sin(seconds*10)*.12F;
-                default -> 0;
-            };
-            float angle=arms*(action.startsWith("mine")||action.equals("diamond_point")||action.equals("scratch")?right:left+right);
+        float arms=switch(action) {
+            case "tree","tree_exposed","fish" -> -1.2F;
+            case "mine" -> (float)(-1.1+Math.sin(seconds*7)*.55);
+            case "mine_hide" -> .8F;
+            case "boat" -> (float)(-.8+Math.sin(seconds*4)*.4);
+            case "door_giggle" -> -.7F;
+            case "diamond_point" -> -1.3F;
+            case "scratch" -> -2.6F+(float)Math.sin(seconds*10)*.12F;
+            default -> 0;
+        };
+        boolean rightOnly=action.startsWith("mine")||action.equals("diamond_point")||action.equals("scratch");
+        boolean bendLegs=action.equals("fish_land")||action.equals("boat");
+        boolean turnHead=action.equals("mirror")||action.startsWith("mine")||action.equals("scope_close");
+        float headAngle=(float)Math.toRadians(pitch);
+        for(int index=0;index<(selected==null?vertexCount:selected.length);index++) {
+            int v=selected==null?index:selected[index];
+            float angle=arms*(rightOnly?actionRight[v]:actionLeft[v]+actionRight[v]);
             if(angle!=0) rotateX(target,targetNormals,v,23,0,angle);
-            if(action.equals("fish_land") || action.equals("boat")) rotateX(target,targetNormals,v,12,0,-1.3F*legs);
+            if(bendLegs) rotateX(target,targetNormals,v,12,0,-1.3F*actionLegs[v]);
             // 挖掘跟随方块俯仰；望远镜随玩家视线反向抬头，让整张脸朝镜头；复用已有骨骼。
-            if(action.equals("mirror")||action.startsWith("mine")||action.equals("scope_close")) rotateX(target,targetNormals,v,27,0,(float)Math.toRadians(pitch)*head);
+            if(turnHead) rotateX(target,targetNormals,v,27,0,headAngle*actionHead[v]);
         }
     }
 

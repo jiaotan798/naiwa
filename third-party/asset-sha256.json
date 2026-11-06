@@ -1,12 +1,12 @@
 {
-  "version": "0.4.4",
-  "date": "2026-10-25",
-  "meaning": "当前上传范围内素材的文件识别与一致性证据",
+  "version": "0.4.9",
+  "date": "2026-11-07",
+  "meaning": "当前交付生产素材与可编辑源文件的识别摘要，不替代许可",
   "files": [
     {
       "path": "assets/runtime/assets/naiwa/models/entity/naiwa.nwm",
-      "bytes": 2405212,
-      "sha256": "e92b61a34e0af2ae09fa0402b35b02e797b4195879105225e2ef675d5d0c70d6"
+      "bytes": 2520124,
+      "sha256": "f54fb82a8a2467e634b9bba69a7eac4781fbd38bc55473ebd41e2d54205b4f1a"
     },
     {
       "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_0.png",
@@ -39,19 +39,19 @@
       "sha256": "f4e3cc68d8d9652c1561c0327e2735d1dc07b58a9f05a1927298fb9f6a2ab042"
     },
     {
+      "path": "assets/source/nailong_origin_zero.bbmodel",
+      "bytes": 8029093,
+      "sha256": "530ab823e6f66065e52b68d9d5a24b765640945cac8e6fca12a590098c7291b9"
+    },
+    {
       "path": "assets/shield/naiwa-shield-v1.png",
       "bytes": 425801,
       "sha256": "d7eef39dab1048d7c1891ea34f6f2d7ac891cbd44179e80155754d91571dacb3"
     },
     {
-      "path": "assets/source/nailong_origin_zero.bbmodel",
-      "bytes": 7421595,
-      "sha256": "5893f524bacf8d99d9e468d7f141489c010a35ca670fb81ece3a64373f2caf9d"
-    },
-    {
       "path": "mod/src/main/resources/assets/naiwa/sounds/laugh_full.ogg",
-      "bytes": 45861,
-      "sha256": "f57870ddfaed8280acdd85154e57b17184199ecd5fbded7a3489a9ce96cc73b1"
+      "bytes": 60661,
+      "sha256": "946d91d5b99b9fa417c01a810bd9484dd0352e3876780c26e2607da5db410524"
     },
     {
       "path": "mod/src/main/resources/assets/naiwa/sounds/laugh_short.ogg",
@@ -67,6 +67,11 @@
       "path": "mod/src/main/resources/assets/naiwa/textures/entity/naiwa_shield.png",
       "bytes": 425801,
       "sha256": "d7eef39dab1048d7c1891ea34f6f2d7ac891cbd44179e80155754d91571dacb3"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/textures/gui/scope_portrait.png",
+      "bytes": 59181,
+      "sha256": "2233c10910757d8aa7b5862292fab427cf8bde7ae8e1b271c83e10aa3dd3a126"
     },
     {
       "path": "mod/src/main/resources/assets/naiwa/textures/item/laugh_gas_bottle.png",
@@ -85,6 +90,11 @@
     },
     {
       "path": "mod/src/main/resources/assets/naiwa/textures/mob_effect/laughing.png",
+      "bytes": 167,
+      "sha256": "c241ab9cb90cf71f0faab4284d28064dad65caaeacc1dcaaa3741b145446a5cd"
+    },
+    {
+      "path": "mod/src/main/resources/assets/naiwa/textures/particle/gas_face.png",
       "bytes": 167,
       "sha256": "c241ab9cb90cf71f0faab4284d28064dad65caaeacc1dcaaa3741b145446a5cd"
     }

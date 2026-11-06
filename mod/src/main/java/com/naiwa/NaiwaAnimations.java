@@ -5,12 +5,12 @@ import java.util.List;
 /** 动画名称及时长来自随附原模型；纯数据可供专服、客户端和结构检查共同使用。 */
 public final class NaiwaAnimations {
     public static final List<String> NAMES = List.of("idle", "walk", "run", "jump", "wave", "laugh_enter", "laugh", "laugh_exit", "ascend_enter", "ascend_hover", "ascend_exit");
-    private static final double[] LENGTHS = {2.4, 1.2, .8, 1.6, 2.4, .6, 7.04, .8, .6, 3, .6};
+    private static final double[] LENGTHS = {2.4, 1.2, .8, 1.6, 2.4, .6, 8.25, .8, .6, 3.04, .6};
     private NaiwaAnimations() {}
 
     /** 返回源模型片段时长，完整大笑则返回三段之和，单位为秒。 */
     public static double length(String name) {
-        // 完整演出按源片段求和；替换模型时不能沿用旧的七秒边界截掉表情收尾。
+        // 完整演出按源片段求和；换模型须同步片段长度，不能用旧边界截断动作或提前转盾。
         if (name.equals("laugh_sequence")) return length("laugh_enter") + length("laugh") + length("laugh_exit");
         int index = NAMES.indexOf(name);
         if (index < 0) throw new IllegalArgumentException("未知奶蛙动画：" + name);

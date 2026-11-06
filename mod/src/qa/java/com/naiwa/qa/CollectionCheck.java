@@ -56,13 +56,11 @@ final class CollectionCheck {
         var owner=trial%2==0?a:v;var observer=trial%2==0?v:a;
         if(age<35||!ack("actor")||!ack("viewer"))return;
         if(step==1){
-            double old=NaiwaConfig.RESPAWN_APPEAR_DISTANCE.get();
-            try{NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(6.0);MultiplayerCheck.require(NaiwaPranks.mock(owner),"正式嘲笑入口创建所属六格演员");}
-            finally{NaiwaConfig.RESPAWN_APPEAR_DISTANCE.set(old);}
+            MultiplayerCheck.require(NaiwaPranks.mock(owner),"固定三格创建所属演员");
             stage(2);
         }else if(step==2){
             expected(owner,observer,false);
-            // 在 8.44 秒完整大笑的采集窗口内腾格或补瓶，验证失败未扣物品，且收场前仍可自动重试。
+            // 在完整大笑的采集窗口内腾格或补瓶，验证失败未扣物品，且收场前仍可自动重试。
             if(trial==4)owner.getInventory().setItem(23,ItemStack.EMPTY);
             if(trial==5)owner.getInventory().setItem(22,new ItemStack(Items.GLASS_BOTTLE,3));
             stage(3);

@@ -2,7 +2,6 @@ package com.naiwa.mixin;
 
 import com.naiwa.NaiwaEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.phys.AABB;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -14,7 +13,7 @@ abstract class ChestBlockEntityMixin {
     @Inject(method="getOpenNess",at=@At("RETURN"),cancellable=true)
     private void naiwa$peekLid(float partialTick,CallbackInfoReturnable<Float> callback) {
         var chest=(ChestBlockEntity)(Object)this;var level=chest.getLevel();
-        if(level!=null&&level.isClientSide&&!level.getEntitiesOfClass(NaiwaEntity.class,new AABB(chest.getBlockPos()).inflate(.5,1,.5),
-                n->n.isAlive()&&n.act().equals("chest_peek")&&n.blockPosition().equals(chest.getBlockPos())).isEmpty())callback.setReturnValue(1F);
+        // 实时核对已登记演员，仍保留原空间条件和大箱子的双盖合并规则。
+        if(level!=null&&level.isClientSide&&NaiwaEntity.isChestPeeking(level,chest.getBlockPos()))callback.setReturnValue(1F);
     }
 }

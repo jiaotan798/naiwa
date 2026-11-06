@@ -43,6 +43,11 @@ public final class Naiwa {
     private static final DeferredRegister<DataComponentType<?>> COMPONENTS = DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, ID);
     private static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, ID);
     private static final DeferredRegister<MobEffect> EFFECTS = DeferredRegister.create(Registries.MOB_EFFECT, ID);
+    private static final DeferredRegister<net.minecraft.core.particles.ParticleType<?>> PARTICLES = DeferredRegister.create(Registries.PARTICLE_TYPE, ID);
+    public static final DeferredHolder<net.minecraft.core.particles.ParticleType<?>,net.minecraft.core.particles.SimpleParticleType> GAS_CLOUD =
+            PARTICLES.register("gas_cloud",()->new net.minecraft.core.particles.SimpleParticleType(false));
+    public static final DeferredHolder<net.minecraft.core.particles.ParticleType<?>,net.minecraft.core.particles.SimpleParticleType> GAS_FACE =
+            PARTICLES.register("gas_face",()->new net.minecraft.core.particles.SimpleParticleType(false));
     public static final DeferredHolder<MobEffect, MobEffect> LAUGHING = EFFECTS.register("laughing",
             () -> new MobEffect(MobEffectCategory.HARMFUL, 0xEACD36) {});
     public static final DeferredHolder<MobEffect, MobEffect> ASCENDING = EFFECTS.register("ascending",
@@ -78,7 +83,7 @@ public final class Naiwa {
 
     public Naiwa(IEventBus bus, ModContainer container) {
         container.registerConfig(ModConfig.Type.SERVER, NaiwaConfig.SPEC);
-        ENTITIES.register(bus); ITEMS.register(bus); COMPONENTS.register(bus); SOUNDS.register(bus); TABS.register(bus); EFFECTS.register(bus);
+        ENTITIES.register(bus); ITEMS.register(bus); COMPONENTS.register(bus); SOUNDS.register(bus); TABS.register(bus); EFFECTS.register(bus);PARTICLES.register(bus);
         bus.addListener((EntityAttributeCreationEvent event) -> event.put(ENTITY.get(), NaiwaEntity.attributes().build()));
         bus.addListener((RegisterSpawnPlacementsEvent event) -> event.register(ENTITY.get(), SpawnPlacementTypes.ON_GROUND,
                 Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,

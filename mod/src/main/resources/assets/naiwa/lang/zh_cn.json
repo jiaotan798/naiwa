@@ -19,9 +19,5 @@
   "naiwa.configuration.prankIntervalMaxSeconds": "整蛊最大间隔（秒）",
   "naiwa.configuration.prankIntervalMaxSeconds.tooltip": "默认 600 秒。只调整十种普通整蛊；首次十秒准备、复活及图腾嘲笑、盾牌现身和本体采气不受影响。",
   "naiwa.configuration.allowConsecutiveSamePrank": "允许同一种整蛊连续触发",
-  "naiwa.configuration.allowConsecutiveSamePrank.tooltip": "默认关闭。开启后下一轮可以再次触发上次的整蛊，仍需冷却结束及满足触发条件，不保证必定重复，也不会重叠演出。",
-  "naiwa.configuration.respawnAppearDistance": "死亡复活出场距离（格）",
-  "naiwa.configuration.respawnAppearDistance.tooltip": "默认 2.5 格，范围 1.5～16，可填小数。按实际复活后的当前位置和水平朝向出场；受阻时尝试增加 1 或 2 格，不超过 16 格。新值用于后续出场，不移动正在演出的奶蛙。",
-  "naiwa.configuration.totemLandingAppearDistance": "图腾落地出场距离（格）",
-  "naiwa.configuration.totemLandingAppearDistance.tooltip": "默认 2.5 格，范围 1.5～16，可填小数。只调整图腾飞升后真正落地时的正前方出场距离，不改变飞升高度或免摔规则；受阻时尝试增加 1 或 2 格，不超过 16 格。新值用于后续出场。"
+  "naiwa.configuration.allowConsecutiveSamePrank.tooltip": "默认关闭。开启后下一轮可以再次触发上次的整蛊，仍需冷却结束及满足触发条件，不保证必定重复，也不会重叠演出。"
 }

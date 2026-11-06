@@ -42,7 +42,6 @@ neoForge {
 // 模型采样产物由脚本生成；构建核对来源摘要，防止替换模型后误带旧资源。
 sourceSets.main.resources.srcDir '../assets/runtime'
 tasks.register('verifyModel', Exec) {
-    // 独立仓库从 PATH 查找 Node，不依赖原开发工作区的运行时目录。
     commandLine 'node', file('../scripts/bake-model.mjs'), '--check'
 }
 def resourceVersion = project.version.toString()

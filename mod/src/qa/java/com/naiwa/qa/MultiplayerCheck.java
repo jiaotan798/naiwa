@@ -30,6 +30,11 @@ public final class MultiplayerCheck {
     private double viewerZ;
     private boolean quitting;
     public MultiplayerCheck() {
+        if(Boolean.getBoolean("naiwa.qa.gasEffects")) {
+            new GasEffectsCheck();
+            if(net.neoforged.fml.loading.FMLEnvironment.dist==net.neoforged.api.distmarker.Dist.CLIENT)new GasEffectsClient();
+            return;
+        }
         if(Boolean.getBoolean("naiwa.qa.collection")) {
             new CollectionCheck();
             if(net.neoforged.fml.loading.FMLEnvironment.dist==net.neoforged.api.distmarker.Dist.CLIENT)new CollectionClient();

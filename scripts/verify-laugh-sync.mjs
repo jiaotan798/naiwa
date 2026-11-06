@@ -20,10 +20,10 @@ for(let offset=0;offset<decoded.stdout.length;offset+=640){
  if(Math.sqrt(sum/count)>=10**(-32/20)){if(audibleStart<0)audibleStart=offset/64000;audibleEnd=(offset+count*4)/64000;}
 }
 const duration=decoded.stdout.length/64000;
-// 新模型比原七秒音轨多 0.04 秒表情收尾；只容许两帧采样的无声尾段，不能宽放起拍误差。
-assert(Math.abs(duration-7)<.025,'原七秒音轨时长不符');
-assert(laugh.length>=duration-.025&&laugh.length-duration<=.05,'模型与音轨收尾间隔超过两帧');
+// 当前同步模型和原速音轨均长 8.25 秒；严查收尾和起拍，拒绝误用旧七秒音轨。
+assert(Math.abs(duration-8.25)<.025,'同步模型的 8.25 秒音轨时长不符');
+assert(Math.abs(laugh.length-duration)<=.025,'模型与音轨收尾间隔超过一帧');
 assert(Math.abs(audibleStart-motionStart)<=.04,`声音起拍 ${audibleStart}s 与身体起拍 ${motionStart}s 不符`);
-assert(audibleEnd<=7.01&&audibleEnd>6.8,'声音未在退出前收尾');
-const report={audio,sha256:crypto.createHash('sha256').update(fs.readFileSync(audio)).digest('hex'),duration,audibleStart,audibleEnd,motionStart,fullSequenceAudibleStart:.6+audibleStart,checks:'PASS'};
+assert(audibleEnd<=8.26&&audibleEnd>8.05,'声音未在退出前收尾');
+const report={audio,sha256:crypto.createHash('sha256').update(fs.readFileSync(audio)).digest('hex'),sourceRange:[.6,8.85],duration,audibleStart,audibleEnd,motionStart,fullSequenceAudibleStart:model.animations.find(a=>a.name==='laugh_enter').length+audibleStart,checks:'PASS'};
 console.log(JSON.stringify(report,null,2));

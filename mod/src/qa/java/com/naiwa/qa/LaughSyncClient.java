@@ -86,7 +86,7 @@ final class LaughSyncClient {
                 require(Math.abs(soundStart-(full?.6:0))<.2,"声音启动与动画时钟偏差超过 0.2 秒："+soundStart);
             }
             if(seen&&!frog.animation().equals("auto")){
-                double[] marks=full?new double[]{.3,1.5,2.75,4.5,7.9}:new double[]{.3,1.5,2.15,4.5,6.7};
+                double[] marks=full?new double[]{.3,1.5,2.2,4.5,9.2}:new double[]{.3,.9,1.6,4.5,8.1};
                 if(sample<marks.length&&seconds>=marks[sample]){
                     var clip=frog.clip(0);double delta=displacement(clip.name(),clip.seconds());
                     if(sample==1)require(delta<.01,"准备段不应提前开始身体大笑 seconds="+seconds+" displacement="+delta);
@@ -98,8 +98,9 @@ final class LaughSyncClient {
             // 等声道自然结束后才能确认完成，不能只看逻辑动作名已恢复 auto。
             if(seen&&frog.animation().equals("auto")&&sample==5&&soundCount==1&&!mc.getSoundManager().isActive(sound)&&!Files.exists(MultiplayerCheck.ROOT.resolve(role+"-"+phase+".ok"))){
                 require(!actor||phase!=2||repeat==2,"没有实际发送重复交互包");
-                double expectedMotion=(full?.6:0)+2.04;
-                String report=String.format(Locale.ROOT,"{\"phase\":%d,\"audioSha256\":\"%s\",\"nativeSources\":%d,\"soundStart\":%.6f,\"audibleStart\":%.6f,\"motionStart\":%.6f,\"repeatInteractions\":%d,\"samples\":[%s],\"checks\":\"PASS\"}",phase,audioHash,soundCount,soundStart,soundStart+2.04,expectedMotion,repeat,String.join(",",samples));
+                // 0.4.5 原生身体起拍为 1.43826 秒，实际 OGG 的可听起拍由解码检查约束在 1.44 秒附近。
+                double expectedMotion=(full?.6:0)+1.43826;
+                String report=String.format(Locale.ROOT,"{\"phase\":%d,\"audioSha256\":\"%s\",\"nativeSources\":%d,\"soundStart\":%.6f,\"audibleStart\":%.6f,\"motionStart\":%.6f,\"repeatInteractions\":%d,\"samples\":[%s],\"checks\":\"PASS\"}",phase,audioHash,soundCount,soundStart,soundStart+1.44,expectedMotion,repeat,String.join(",",samples));
                 MultiplayerCheck.write(role+"-laugh-"+phase+".json",report);MultiplayerCheck.write(role+"-"+phase+".ok","PASS\n");
             }
         }catch(Throwable e){done=true;e.printStackTrace();try{MultiplayerCheck.write(role+"-result.txt","FAIL "+e);}catch(Exception ignored){}mc.stop();}

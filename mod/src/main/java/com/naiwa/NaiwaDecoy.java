@@ -20,6 +20,8 @@ import java.util.List;
 public final class NaiwaDecoy extends Entity {
     private boolean exposed;
     private boolean transferred;
+    // 不落盘、不代表场景仍有效；旧实例及重载副本必须由当前场景实例核对后才能被认作活动诱饵。
+    java.util.UUID prankOwner;
     private final List<ItemStack> diamonds=new ArrayList<>();
     public NaiwaDecoy(EntityType<? extends NaiwaDecoy> type,Level level) {super(type,level);setNoGravity(true);}
     @Override protected void defineSynchedData(SynchedEntityData.Builder builder) {}
@@ -61,9 +63,9 @@ public final class NaiwaDecoy extends Entity {
         super.remove(reason);
     }
     @Override public boolean isPickable() {return !isInvisible();}
-    @Override public boolean hurt(DamageSource source,float amount) {if(!level().isClientSide)exposed=true;return false;}
+    @Override public boolean hurt(DamageSource source,float amount) {if(!level().isClientSide&&NaiwaPranks.canExposeDecoy(this))exposed=true;return false;}
     @Override public InteractionResult interact(Player player,InteractionHand hand) {
-        if(!level().isClientSide)exposed=true;
+        if(!level().isClientSide&&NaiwaPranks.canExposeDecoy(this))exposed=true;
         return InteractionResult.sidedSuccess(level().isClientSide);
     }
     public boolean exposed() {return exposed;}

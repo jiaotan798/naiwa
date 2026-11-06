@@ -3,14 +3,11 @@ package com.naiwa;
 import net.minecraft.util.RandomSource;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-/** 服务端统一决定整蛊调度和嘲笑出场距离；NeoForge 负责文件校验、存档覆盖及客户端同步。 */
+/** 服务端统一决定三项整蛊调度设置；NeoForge 负责旧字段清理、存档覆盖及客户端同步。 */
 public final class NaiwaConfig {
     public static final ModConfigSpec SPEC;
     public static final ModConfigSpec.IntValue MIN_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS;
     public static final ModConfigSpec.BooleanValue ALLOW_CONSECUTIVE_SAME_PRANK;
-    public static final ModConfigSpec.DoubleValue RESPAWN_APPEAR_DISTANCE, TOTEM_LANDING_APPEAR_DISTANCE;
-    // 单位格；低于场景演员的二十格离场边界，受阻候选距离也不能超过该上限。
-    static final double MAX_APPEAR_DISTANCE = 16;
     static {
         var builder = new ModConfigSpec.Builder();
         MIN_INTERVAL_SECONDS = builder.comment("整蛊最小间隔，单位秒。与最大值相同则固定间隔；0 允许无额外等待，但不重叠演出。",
@@ -21,12 +18,6 @@ public final class NaiwaConfig {
                 .translation("naiwa.configuration.prankIntervalMaxSeconds").defineInRange("prankIntervalMaxSeconds", 600, 0, 86400);
         ALLOW_CONSECUTIVE_SAME_PRANK = builder.comment("允许同一种整蛊在下一轮再次触发；仍须冷却结束并满足原触发及安全条件。")
                 .translation("naiwa.configuration.allowConsecutiveSamePrank").define("allowConsecutiveSamePrank", false);
-        RESPAWN_APPEAR_DISTANCE = builder.comment("死亡实际复活后，奶蛙在玩家当前水平正前方的优先出场距离，单位格，允许小数。",
-                "默认 2.5，范围 1.5～16；受阻时尝试增加 1 或 2 格，但不超过 16 格。仅影响后续出场，不挪动正在演出的奶蛙。")
-                .translation("naiwa.configuration.respawnAppearDistance").defineInRange("respawnAppearDistance", 2.5, 1.5, MAX_APPEAR_DISTANCE);
-        TOTEM_LANDING_APPEAR_DISTANCE = builder.comment("图腾飞升后真正落地时，奶蛙在玩家当前水平正前方的优先出场距离，单位格，允许小数。",
-                "默认 2.5，范围 1.5～16；受阻时尝试增加 1 或 2 格，但不超过 16 格。不改变飞升高度、落地时序或免摔规则。")
-                .translation("naiwa.configuration.totemLandingAppearDistance").defineInRange("totemLandingAppearDistance", 2.5, 1.5, MAX_APPEAR_DISTANCE);
         SPEC = builder.build();
     }
     private NaiwaConfig() {}

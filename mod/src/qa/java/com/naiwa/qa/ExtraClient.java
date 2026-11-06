@@ -91,7 +91,7 @@ final class ExtraClient {
                         slot(mc,1);mc.player.setYRot(0);mc.player.setXRot(0);
                         if(action==0){mc.options.keyUse.setDown(true);if(!mc.player.isUsingItem())mc.gameMode.useItem(mc.player,InteractionHand.MAIN_HAND);action=1;}
                         // 临时标志只由服务端保存，不能拿未同步的客户端字段判定；权威检查在 ExtraCheck。
-                        ready=frog!=null&&frog.distanceToSqr(mc.player)>=64&&mc.player.isUsingItem();
+                        ready=frog!=null&&frog.scopeViewer()==mc.player.getId()&&mc.player.isUsingItem();
                     }
                 }
             } else if(sub==1){
@@ -103,14 +103,15 @@ final class ExtraClient {
                 if(actor)switch(kind){
                     case "creeper" -> {if(!abort&&frog!=null)look(mc,frog.getEyePosition());}
                     case "diamond" -> {
-                        if(frog!=null){release(mc);look(mc,frog.getEyePosition());}
-                        else if(bait!=null){if(abort){if(walk(mc,bait.position(),2.5)&&action==0){mc.gameMode.attack(mc.player,bait);action=1;}}else walk(mc,bait.position(),1.4);}
+                        if(abort&&bait!=null){if(walk(mc,bait.position(),2.5))mc.gameMode.attack(mc.player,bait);}
+                        else if(frog!=null){release(mc);look(mc,frog.getEyePosition());}
+                        else if(bait!=null)walk(mc,bait.position(),1.4);
                     }
                     case "chest" -> {
                         if(abort)walk(mc,new Vec3(.5,81,24),.5);
                         else {if(action==0){chest(mc);action=1;}else if(action==1&&mc.player.containerMenu instanceof ChestMenu menu){require(menu.getSlot(0).getItem().getCount()==37,"重新开箱仍有完整原物品");close(mc);action=2;}if(frog!=null)look(mc,frog.getEyePosition());}
                     }
-                    case "scope" -> {if(abort){mc.player.setYRot(180);mc.player.setXRot(0);}else {if(action==0){mc.options.keyUse.setDown(false);mc.gameMode.releaseUsingItem(mc.player);action=1;}if(frog!=null)look(mc,frog.getEyePosition());}}
+                    case "scope" -> {if(abort){mc.options.keyUse.setDown(false);mc.gameMode.releaseUsingItem(mc.player);mc.player.setYRot(180);mc.player.setXRot(0);}else {if(action==0){mc.options.keyUse.setDown(false);mc.gameMode.releaseUsingItem(mc.player);action=1;}if(frog!=null)look(mc,frog.getEyePosition());}}
                 } else if(frog!=null)look(mc,frog.getEyePosition());
                 ready=abort?frog==null&&bait==null:frog!=null&&frog.animation().equals("laugh_sequence");
             } else if(sub==3){

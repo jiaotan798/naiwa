@@ -22,10 +22,14 @@ import net.minecraft.world.level.Level;
 
 /** 可存档的奶蛙本体；演出状态只由服务端启动，同步原片段名称与世界起始时刻。 */
 public final class NaiwaEntity extends PathfinderMob {
+    // 只登记已入场的探头演员 ID；弱世界键且值不引用实体/世界，避免退出后静态表保留整个世界。
+    // 两端共用生命周期规则，箱盖仅在客户端读取；集成服与客户端线程可能并发，整次读写共用此表的锁。
+    private static final java.util.Map<Level, java.util.Set<Integer>> CHEST_PEEKERS = new java.util.WeakHashMap<>();
     private static final EntityDataAccessor<String> ANIMATION = SynchedEntityData.defineId(NaiwaEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Long> START = SynchedEntityData.defineId(NaiwaEntity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<String> ACT = SynchedEntityData.defineId(NaiwaEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> BOAT_STEERING = SynchedEntityData.defineId(NaiwaEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> SCOPE_VIEWER = SynchedEntityData.defineId(NaiwaEntity.class, EntityDataSerializers.INT);
     private long airborneStart = -1;
     private boolean laughSoundPlayed;
     private boolean miningRotation;
@@ -34,8 +38,12 @@ public final class NaiwaEntity extends PathfinderMob {
     private ItemStack convertingShield;
     private boolean collected;
     private long nextGas;
+    // 仅供原版堆叠空间比较；不交给 inventory.add，失败重试不再逐 tick 创建待交付物品栈。
+    private ItemStack gasSpaceProbe;
     // 整蛊实例不保存到存档；重载时删除临时演员，避免永久占座或留下无主道具。
     private boolean temporary;
+    // 仅作服务端场景查找提示，不写入存档；是否仍为演员必须再核对当前场景中的实体实例。
+    java.util.UUID prankOwner;
 
     public NaiwaEntity(EntityType<? extends NaiwaEntity> type, Level level) {super(type, level);}
 
@@ -46,6 +54,7 @@ public final class NaiwaEntity extends PathfinderMob {
     @Override protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(ANIMATION, "auto"); builder.define(START, 0L); builder.define(ACT, ""); builder.define(BOAT_STEERING, 0);
+        builder.define(SCOPE_VIEWER,-1);
     }
 
     @Override protected void registerGoals() {
@@ -71,6 +80,9 @@ public final class NaiwaEntity extends PathfinderMob {
     public String animation() {return entityData.get(ANIMATION);}
     public String act() {return entityData.get(ACT);}
     public int boatSteering() {return entityData.get(BOAT_STEERING);}
+    public int scopeViewer() {return entityData.get(SCOPE_VIEWER);}
+    /** 仅同步本轮镜内图片的观看者，-1 撤图；临时演员重载即清理，不保存旧玩家实体 ID。 */
+    void setScopeViewer(int viewer) {entityData.set(SCOPE_VIEWER,viewer);}
     /** 0 为不接管，1 为前进，2/3 为前进并间歇左/右转，4 为大笑时只保留回头视角；不写入存档。 */
     public void setBoatSteering(int command) {
         if(command<0||command>4)throw new IllegalArgumentException("未知划船指令："+command);
@@ -81,7 +93,45 @@ public final class NaiwaEntity extends PathfinderMob {
         return act().equals("chest_peek")?net.minecraft.world.entity.EntityDimensions.scalable(.65F,.7F).withEyeHeight(.3F):super.getDefaultDimensions(pose);
     }
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
-        super.onSyncedDataUpdated(key);if(ACT.equals(key))refreshDimensions();
+        super.onSyncedDataUpdated(key);
+        if(ACT.equals(key)) {refreshDimensions();updateChestPeeker();}
+    }
+    /** 动作包可以先于或后于入场到达；两个入口都更新集合，同一 ID 重复登记不会累计。 */
+    @Override public void onAddedToLevel() {
+        super.onAddedToLevel();updateChestPeeker();
+    }
+    /** 卸载、退场和换维度均释放旧世界登记，不等待下一 tick；仅保留原版箱盖恢复行为。 */
+    @Override public void onRemovedFromLevel() {
+        super.onRemovedFromLevel();updateChestPeeker();
+    }
+    private void updateChestPeeker() {
+        synchronized(CHEST_PEEKERS) {
+            if(isAddedToLevel() && act().equals("chest_peek")) {
+                CHEST_PEEKERS.computeIfAbsent(level(),key->new java.util.HashSet<>()).add(getId());
+            } else {
+                var actors=CHEST_PEEKERS.get(level());
+                if(actors!=null) {actors.remove(getId());if(actors.isEmpty())CHEST_PEEKERS.remove(level());}
+            }
+        }
+    }
+    /** 仅作无演员时的快速拒绝；有演员时仍按原空间、存活及位置条件实时检查，不缓存箱盖结果。 */
+    public static boolean hasChestPeekers(Level level) {return chestPeekerCount(level)>0;}
+    /** 只遍历已登记的探头 ID，再读取实时位置和包围盒；其他箱子不再扫描普通实体或创建结果列表。 */
+    public static boolean isChestPeeking(Level level,net.minecraft.core.BlockPos pos) {
+        synchronized(CHEST_PEEKERS) {
+            var actors=CHEST_PEEKERS.get(level);if(actors==null)return false;
+            for(int id:actors) {
+                var entity=level.getEntity(id);
+                if(entity instanceof NaiwaEntity frog&&frog.isAlive()&&frog.act().equals("chest_peek")&&frog.blockPosition().equals(pos)
+                        &&frog.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(pos).inflate(.5,1,.5)))return true;
+            }
+            return false;
+        }
+    }
+    static int chestPeekerCount(Level level) {
+        synchronized(CHEST_PEEKERS) {
+            var actors=CHEST_PEEKERS.get(level);return actors==null?0:actors.size();
+        }
     }
     public void setAct(String act) {if (!level().isClientSide) entityData.set(ACT,act);}
     /** 世界时间按 20 tick/秒换算，渲染插值不单独累加客户端时钟，避免围观者播放速度不同。 */
@@ -114,8 +164,8 @@ public final class NaiwaEntity extends PathfinderMob {
         if (!level().isClientSide) conversion();
         if (!level().isClientSide && !animation().equals("auto")) {
             getNavigation().stop();
-            // 音轨保留原素材 0～7 秒和约 2.04 秒准备段；新模型大笑含额外 0.04 秒表情收尾，先入场 0.6 秒。
-            // 不能只剪掉音轨静音，否则笑声会比身体抖动提前两秒；单轮只广播一次，不改变原声速。
+            // 新模型身体起拍在 laugh 约 1.44 秒；音轨取原素材 0.6～8.85 秒，保留约 1.44 秒准备静音。
+            // 入场结束后启动，完整演出约 2.04 秒音画起拍；单轮只广播一次，不改变原声速。
             boolean full=animation().equals("laugh_sequence");
             if (!laughSoundPlayed && (animation().equals("laugh") || full && animationSeconds(0)>=.6)) {
                 laughSoundPlayed=true;
@@ -155,6 +205,8 @@ public final class NaiwaEntity extends PathfinderMob {
         }
         if (!isAlive() || !animation().equals("auto") || tickCount % 10 != 0) return;
         for (Player player : level().getEntitiesOfClass(Player.class, getBoundingBox().inflate(5), p -> p.isAlive() && !p.isSpectator())) {
+            // 无普通盾的玩家不参与转化，先跳过以免空做视线和竞争演员查询。
+            if (!player.getMainHandItem().is(Items.SHIELD) && !player.getOffhandItem().is(Items.SHIELD)) continue;
             if (!hasLineOfSight(player)) continue;
             // 附近可能有多只常驻本体；同一玩家只允许一只启动转化，避免重叠大笑和竞争同一面盾。
             if (!level().getEntitiesOfClass(NaiwaEntity.class,player.getBoundingBox().inflate(8),
@@ -221,12 +273,12 @@ public final class NaiwaEntity extends PathfinderMob {
     private boolean collectSlot(Player player,int slot) {
         var inventory=player.getInventory();ItemStack bottles=inventory.getItem(slot);
         if(!collectionReady()||!player.isAlive()||player.isSpectator()||player.level()!=level()||!bottles.is(Items.GLASS_BOTTLE))return false;
-        ItemStack gas=new ItemStack(Naiwa.GAS.get());
-        if (bottles.getCount()==1) inventory.setItem(slot,gas);
+        if (bottles.getCount()==1) inventory.setItem(slot,new ItemStack(Naiwa.GAS.get()));
         else {
             // 原版空间判定同时包含副手的未满堆叠，避免满背包但副手可合并时误判无处交付。
-            boolean room=inventory.getFreeSlot()>=0||inventory.getSlotWithRemainingSpace(gas)>=0;
-            if (!room || !inventory.add(gas)) return false;
+            if(gasSpaceProbe==null)gasSpaceProbe=new ItemStack(Naiwa.GAS.get());
+            boolean room=inventory.getFreeSlot()>=0||inventory.getSlotWithRemainingSpace(gasSpaceProbe)>=0;
+            if (!room || !inventory.add(new ItemStack(Naiwa.GAS.get()))) return false;
             bottles.shrink(1);
         }
         // 常驻本体也能被空手逗笑，因此另设五分钟采集间隔，不能绕过整蛊间隔连续刷瓶。

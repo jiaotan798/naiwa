@@ -1,0 +1,10 @@
+{
+  "targets": ["scene", {"name":"extract","width":1,"height":1}, {"name":"blur_h","width":1,"height":1}, {"name":"blur_v","width":1,"height":1}, "composite"],
+  "passes": [
+    {"name":"naiwa:holy_copy","intarget":"minecraft:main","outtarget":"scene"},
+    {"name":"naiwa:holy_extract","intarget":"scene","outtarget":"extract","use_linear_filter":true},
+    {"name":"naiwa:holy_blur","intarget":"extract","outtarget":"blur_h","use_linear_filter":true,"uniforms":[{"name":"BlurDirection","values":[0.003,0]}]},
+    {"name":"naiwa:holy_blur","intarget":"blur_h","outtarget":"blur_v","use_linear_filter":true,"uniforms":[{"name":"BlurDirection","values":[0,0.0053]}]},
+    {"name":"naiwa:holy_composite","intarget":"blur_v","outtarget":"composite","use_linear_filter":true,"auxtargets":[{"name":"SceneSampler","id":"scene"}]}
+  ]
+}

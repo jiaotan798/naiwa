@@ -69,7 +69,7 @@ public final class NaiwaShieldTests {
         h.getLevel().addFreshEntity(mob); return mob;
     }
 
-    @GameTest(template="empty", timeoutTicks=210)
+    @GameTest(template="empty", timeoutTicks=235)
     public static void conversionPreservesOriginalComponents(GameTestHelper h) {
         var p = player(h); var frog = frog(h);
         var shield = new ItemStack(Items.SHIELD); shield.setDamageValue(123);
@@ -83,7 +83,8 @@ public final class NaiwaShieldTests {
             h.assertTrue(frog.animation().equals("laugh_sequence"), "接近持盾玩家后先表演");
             h.assertTrue(p.getOffhandItem() == shield, "大笑尚未结束不能提前替换原盾");
         });
-        h.runAfterDelay(185, () -> finish(h,p, () -> {
+        h.runAfterDelay(185, () -> h.assertTrue(p.getOffhandItem()==shield, "新模型完整恢复动作结束前不提前转盾"));
+        h.runAfterDelay(210, () -> finish(h,p, () -> {
             var converted = p.getOffhandItem();
             h.assertTrue(converted.is(Naiwa.SHIELD.get()) && converted.getCount()==1, "只原位转化一面副手盾");
             var expected=shield.transmuteCopy(Naiwa.SHIELD.get()); expected.set(Naiwa.CHARGE.get(),0);
@@ -160,6 +161,18 @@ public final class NaiwaShieldTests {
         } finally {remove(p);}
     }
 
+    /** 共用击退入口必须区分图腾与盾牌，不能将盾牌强化误带到图腾。 */
+    @GameTest(template="empty",timeoutTicks=20)
+    public static void totemPushKeepsOriginalHorizontalAndVerticalImpulse(GameTestHelper h) {
+        var p=player(h);var mob=target(h,p.position().add(0,0,2));
+        try {
+            mob.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE).setBaseValue(0);
+            mob.setOnGround(true);mob.setDeltaMovement(Vec3.ZERO);NaiwaShield.pushAround(p);
+            h.assertTrue(Math.abs(mob.getDeltaMovement().z-.9)<.0001&&Math.abs(mob.getDeltaMovement().y-.4)<.0001,"图腾仍为水平0.9、地面抬升上限0.4");
+            h.assertTrue(mob.getHealth()==20,"无额外伤害");h.succeed();
+        } finally {remove(p);}
+    }
+
     @GameTest(template="empty", timeoutTicks=100)
     public static void queuedBurstsKeepCapturedFacingAndNeverDealDamage(GameTestHelper h) {
         var p=player(h); var shield=new ItemStack(Naiwa.SHIELD.get()); raise(p,shield);
@@ -169,7 +182,7 @@ public final class NaiwaShieldTests {
         p.setYRot(180); p.setYHeadRot(180);
         h.runAfterDelay(20, () -> {
             // NoAI 夹具不会自行 travel；验证真实 knockback 产生的速度，避免把静止夹具当成击退失败。
-            h.assertTrue(front.getDeltaMovement().z>.1 && back.getDeltaMovement().horizontalDistanceSqr()<.001,
+            h.assertTrue(front.getDeltaMovement().z>1.3 && back.getDeltaMovement().horizontalDistanceSqr()<.001,
                     "转头不会把已排队的击退改到身后：front="+front.getDeltaMovement()+", back="+back.getDeltaMovement());
             h.assertTrue(front.getHealth()==20 && back.getHealth()==20 && p.getHealth()==20, "击退不额外造成伤害");
             front.setPos(p.position().add(0,0,2)); front.setDeltaMovement(Vec3.ZERO);

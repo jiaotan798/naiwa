@@ -19,9 +19,5 @@
   "naiwa.configuration.prankIntervalMaxSeconds": "Maximum prank interval (seconds)",
   "naiwa.configuration.prankIntervalMaxSeconds.tooltip": "Default: 600 seconds. Affects the ten regular pranks only, not the initial ten-second delay, respawn/totem mockery, shield encounters or collection cooldown.",
   "naiwa.configuration.allowConsecutiveSamePrank": "Allow consecutive pranks of the same type",
-  "naiwa.configuration.allowConsecutiveSamePrank.tooltip": "Default: off. Allows, but does not force, the previous prank again after its cooldown. Trigger and safety checks still apply; scenes never overlap.",
-  "naiwa.configuration.respawnAppearDistance": "Respawn appearance distance (blocks)",
-  "naiwa.configuration.respawnAppearDistance.tooltip": "Default: 2.5 blocks. Range: 1.5–16; decimals allowed. Uses the respawned player's current position and horizontal facing. If blocked, tries 1 or 2 blocks farther, never beyond 16. Changes apply to later appearances, not an active scene.",
-  "naiwa.configuration.totemLandingAppearDistance": "Totem landing appearance distance (blocks)",
-  "naiwa.configuration.totemLandingAppearDistance.tooltip": "Default: 2.5 blocks. Range: 1.5–16; decimals allowed. Adjusts the forward appearance distance after actual landing, not flight height or fall protection. If blocked, tries 1 or 2 blocks farther, never beyond 16. Changes apply to later appearances."
+  "naiwa.configuration.allowConsecutiveSamePrank.tooltip": "Default: off. Allows, but does not force, the previous prank again after its cooldown. Trigger and safety checks still apply; scenes never overlap."
 }
