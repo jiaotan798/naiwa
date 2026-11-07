@@ -1,6 +1,6 @@
 # 奶蛙
 
-奶蛙会在你挖矿、钓鱼或开门时突然出现，整蛊得逞后捧腹大笑。带上空玻璃瓶，还能收走它笑出来的笑气。
+奶蛙会在你挖矿、钓鱼或开门时突然现身，整蛊得逞后捧腹大笑，带着空玻璃瓶还能收集它笑出来的笑气。**0.4.9** 加入笑气瓶破碎特效，瓶子碎开时会冒出淡黄色烟雾，飞出几枚奶蛙表情。
 
 ## 下载与安装
 
@@ -15,7 +15,7 @@
 | 26.1.2 | NeoForge 26.1.2.94 | 客户端及服务端 | 无 |
 | 26.1.2 | Fabric Loader 0.19.4 | 客户端及服务端 | Fabric API 0.149.0+26.1.2 |
 
-把 JAR 和所需前置放进对应实例的 `mods` 目录，每个实例只保留一个奶蛙版本。联机两端安装同一个奶蛙包。游戏 Java 版本、升级与配置说明见 [安装指南](https://github.com/jiaotan798/naiwa/releases/download/v0.4.9/INSTALL.md)。
+把匹配的 JAR 和所需前置放进对应实例的 `mods` 目录。游戏 Java 版本、联机和升级步骤见[安装指南](https://github.com/jiaotan798/naiwa/releases/download/v0.4.9/INSTALL.md)。
 
 ## 玩法
 
@@ -28,13 +28,13 @@
 
 ## 构建源码
 
-构建 1.21.1 NeoForge 需要 JDK 21 和 Node.js 22 或更新版本。将 `JAVA_HOME` 指向 JDK，并把 Node 加入 `PATH`。首次构建需要联网下载依赖。从仓库根目录运行：
+从仓库根目录运行以下命令构建 1.21.1 NeoForge 版。
 
 ```powershell
-.\mod\gradlew.bat -p mod build runGameTestServer
+.\mod\gradlew.bat -p mod build
 ```
 
-产物在 `mod/build/libs/`。其他五个目标各有构建入口，所需 JDK、Wrapper、输出路径和实测范围见[多加载器构建说明](ports/README.md)。模型重新采样见[模型接入说明](docs/模型接入说明.md)。
+产物在 `mod/build/libs/`。构建环境、测试命令和其他版本的步骤见[多加载器构建说明](ports/README.md)。
 
 ## 反馈
 

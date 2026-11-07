@@ -1,9 +1,10 @@
 # 奶蛙多加载器构建
 
-各端共用 [1.21.1 主工程](../README.md)的玩法源码、模型、音效和配方。请克隆完整仓库。首次构建需要联网，安装 Node.js 22 或更新版本并加入 `PATH`，然后将 `JAVA_HOME` 指向目标的构建 JDK。
+各端共用 [1.21.1 主工程](../README.md#构建源码)的玩法源码、模型、音效和配方。请克隆完整仓库。首次构建需要联网，安装 Node.js 22 或更新版本并加入 `PATH`，然后将 `JAVA_HOME` 指向目标的构建 JDK。需要重新采样模型时，见[模型接入说明](../docs/模型接入说明.md)。
 
 | Minecraft | 加载器 | 构建 JDK / 游戏 Java | Fabric API |
 | --- | --- | --- | --- |
+| 1.21.1 | NeoForge 21.1.252 | 21 / 21 | — |
 | 1.20.1 | Forge 47.4.23 | 17 / 17 | — |
 | 1.20.1 | Fabric Loader 0.19.4 | 21 / 17 | 0.92.9+1.20.1 |
 | 1.21.1 | Fabric Loader 0.19.4 | 21 / 21 | 0.116.7+1.21.1 |
@@ -13,6 +14,7 @@
 从仓库根目录按目标选择命令。Fabric 1.20.1 的服务端测试还需要 Gradle 能找到 JDK 17，可用 `-Porg.gradle.java.installations.paths=<JDK 17 路径>` 指定。
 
 ```powershell
+.\mod\gradlew.bat -p mod build runGameTestServer
 .\ports\forge-1.20.1\gradlew.bat -p ports/forge-1.20.1 build runGameTestServer -PgameTests
 .\mod\gradlew.bat -p ports/fabric-1.20.1 build
 .\mod\gradlew.bat -p ports/fabric-1.21.1 build
