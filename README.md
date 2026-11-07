@@ -38,10 +38,14 @@
 
 ## 反馈
 
-遇到问题可在 [Issues](https://github.com/jiaotan798/naiwa/issues) 反馈，或搜索 QQ 群 **873511838**。请附上奶蛙版本、Minecraft 版本、加载器和复现步骤。
+在 QQ 搜索群号 **873511838**，或扫描下方二维码加入「mc模组问题反馈群」。也可以在本仓库的 **[Issues](https://github.com/jiaotan798/naiwa/issues)** 提交问题。反馈时请附上模组版本、Minecraft 版本、加载器和复现步骤。
+
+<img src=".github/feedback-qq.png" alt="mc模组问题反馈群二维码，群号 873511838" width="220">
 
 ## 作者、许可与素材
 
-作者为 [jiaotan798](https://github.com/jiaotan798)。[哔哩哔哩](https://space.bilibili.com/409729840) · [抖音](https://v.douyin.com/KDs5ZxJh5V8/)
+作者：jiaotan_。
+
+- jiaotan_：[bilibili](https://space.bilibili.com/409729840?) · [抖音](https://v.douyin.com/KDs5ZxJh5V8/)
 
 项目原创内容保留全部权利。玩家安装、整合包、服务器和视频直播的使用范围见 [LICENSE](LICENSE) 与 [玩家使用授权](PLAYER_USAGE.md)。上游依赖及素材适用各自的许可。[代码与素材来源](THIRD_PARTY_NOTICES.md)
