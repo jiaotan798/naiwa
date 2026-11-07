@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "naiwa",
+  "version": "${version}",
+  "name": "奶蛙",
+  "description": "奶蛙、十种生存整蛊、笑气瓶、奶蛙盾与图腾飞升。",
+  "license": "All Rights Reserved",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.naiwa.Naiwa"],
+    "client": ["com.naiwa.client.NaiwaFabricClient"]
+  },
+  "mixins": ["naiwa.fabric.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.19.4",
+    "fabric-api": ">=0.116.7+1.21.1",
+    "minecraft": "1.21.1",
+    "java": ">=21"
+  }
+}

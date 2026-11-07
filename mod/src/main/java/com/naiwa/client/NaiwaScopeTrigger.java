@@ -1,22 +1,18 @@
 package com.naiwa.client;
 
 import com.naiwa.NaiwaScopeRequest;
+import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 /** 真实开镜申请四格演员；服务端同步本轮观看者后才在原版镜框内显示参考图片。 */
 final class NaiwaScopeTrigger {
     private static int lastRequest=-100;
-    static void register(){NeoForge.EVENT_BUS.addListener(NaiwaScopeTrigger::render);}
-    private static void render(RenderLevelStageEvent event) {
+    static void render(Consumer<NaiwaScopeRequest> send) {
         var mc=Minecraft.getInstance();
-        if(event.getStage()!=RenderLevelStageEvent.Stage.AFTER_ENTITIES)return;
         if(mc.player==null||!mc.player.isScoping()){lastRequest=-100;return;}
         // 等原版开镜缩放稳定再出场；之后每秒重试一次，服务器拒绝冷却中或已有场景的重复请求。
         int used=mc.player.getTicksUsingItem();if(used<12||used-lastRequest<20)return;
-        PacketDistributor.sendToServer(new NaiwaScopeRequest(4));lastRequest=used;
+        send.accept(new NaiwaScopeRequest(4));lastRequest=used;
     }
 
     /** 不按持有物品或附近任意奶蛙显示；松开、换世界、演员离场及打开界面均即时撤图。 */

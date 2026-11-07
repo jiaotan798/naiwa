@@ -1,0 +1,65 @@
+plugins { id 'net.fabricmc.fabric-loom-remap' version '1.15.5' }
+
+def baseMod = file('../../mod')
+def baseProperties = new Properties()
+file("${baseMod}/gradle.properties").withInputStream { baseProperties.load(it) }
+version = baseProperties.getProperty('mod_version')
+group = 'com.naiwa'
+base.archivesName = 'naiwa'
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+dependencies {
+    minecraft 'com.mojang:minecraft:1.21.1'
+    mappings loom.officialMojangMappings()
+    modImplementation 'net.fabricmc:fabric-loader:0.19.4'
+    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.116.7+1.21.1'
+}
+
+// 只替换加载器入口与 Minecraft 补丁接口；两边编译同一份玩法和模型。
+compileJava.source fileTree("${baseMod}/src/main/java") {
+    exclude 'com/naiwa/Naiwa.java', 'com/naiwa/NaiwaPlatform.java', 'com/naiwa/NaiwaConfig.java'
+    exclude 'com/naiwa/NaiwaNeoForge*.java', 'com/naiwa/*Tests.java'
+    exclude 'com/naiwa/mixin/FishingHookMixin.java', 'com/naiwa/mixin/NeoForgeEntityLifecycleMixin.java'
+    exclude 'com/naiwa/client/AcceptanceProbe.java', 'com/naiwa/client/FullGameplayProbe.java'
+    exclude 'com/naiwa/client/ClientBootstrap.java', 'com/naiwa/client/NaiwaWorldShader.java'
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+sourceSets.main.resources.srcDirs "${baseMod}/src/main/resources", '../../assets/runtime'
+tasks.register('verifyModel', Exec) {
+    commandLine 'node', file('../../scripts/bake-model.mjs'), '--check'
+}
+processResources {
+    dependsOn verifyModel
+    inputs.property 'version', project.version.toString()
+    exclude 'META-INF/neoforge.mods.toml', 'data/naiwa/neoforge/**', 'data/naiwa/structure/empty.nbt'
+    exclude 'model-manifest.json', 'native-pose-checks.json', 'naiwa.mixins.json'
+    filesMatching('fabric.mod.json') { expand(version: project.version) }
+}
+remapJar { archiveFileName = "naiwa-${project.version}-Fabric-1.21.1.jar" }
+loom { runs { server { programArgs '--nogui' } } }
+
+fabricApi { configureTests { createSourceSet = true; modId = 'naiwa-tests'; enableClientGameTests = false; eula = true } }
+compileGametestJava.source file("${baseMod}/src/qa/java/com/naiwa/qa/mixin/BackgroundMouseMixin.java")
+loom.runs {
+    clientSmoke {
+        client()
+        source sourceSets.gametest
+        runDir 'run-client-smoke'
+        vmArg '-Dnaiwa.fabric.smoke=true'
+        programArgs '--username', 'NaiwaFabricQA'
+    }
+}
+tasks.named('runClientSmoke') { timeout = java.time.Duration.ofMinutes(3) }
+tasks.named('processGametestResources') {
+    from("${baseMod}/src/main/resources") { include 'data/naiwa/structure/empty.nbt' }
+}
+sourceSets.test.java.srcDir "${baseMod}/src/test/java"
+tasks.named('test', Test) { failOnNoDiscoveredTests = false }
+tasks.register('modelChecks', JavaExec) {
+    dependsOn testClasses
+    workingDir baseMod
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.naiwa.client.ModelChecks'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn modelChecks, 'runGameTest' }

@@ -13,6 +13,7 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.SpawnPlacementTypes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -32,6 +33,11 @@ import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 /** 集中注册实体、物品与同步组件；玩法结算由服务端事件入口负责。 */
 @Mod(Naiwa.ID)
@@ -89,14 +95,21 @@ public final class Naiwa {
                 Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 (type, level, reason, pos, random) -> level.getBlockState(pos.below()).is(Blocks.GRASS_BLOCK)
                         && level.getRawBrightness(pos, 0) > 8, RegisterSpawnPlacementsEvent.Operation.REPLACE));
-        NeoForge.EVENT_BUS.addListener(NaiwaCommands::register);
-        NaiwaShield.registerEvents();
-        NaiwaEncounters.registerEvents();
-        NaiwaGameplay.registerEvents();
-        NaiwaEffectSync.registerEvents();
-        NaiwaPranks.registerEvents();
-        bus.addListener(NaiwaScopeRequest::register);
-        bus.addListener(NaiwaFlightHeight::register);
+        NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> NaiwaCommands.register(event.getDispatcher()));
+        NaiwaNeoForgeGameplay.registerShieldEvents();
+        NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post event) -> NaiwaEncounters.tick(event.getServer()));
+        NeoForge.EVENT_BUS.addListener((ServerStoppedEvent event) -> NaiwaEncounters.stopped());
+        NaiwaNeoForgeGameplay.registerEvents();
+        NeoForge.EVENT_BUS.addListener((PlayerEvent.StartTracking event) -> {
+            if (event.getEntity() instanceof ServerPlayer viewer) NaiwaEffectSync.startedTracking(viewer,event.getTarget());
+        });
+        NaiwaNeoForgePranks.registerEvents();
+        bus.addListener((RegisterPayloadHandlersEvent event) -> {
+            event.registrar("2").playToServer(NaiwaScopeRequest.TYPE, NaiwaScopeRequest.CODEC, (request, context) ->
+                    context.enqueueWork(() -> {if(context.player() instanceof ServerPlayer player) request.apply(player);}));
+            event.registrar("1").playToClient(NaiwaFlightHeight.TYPE, NaiwaFlightHeight.CODEC, (update, context) ->
+                    context.enqueueWork(() -> NaiwaFlightHeight.apply(context.player(),update.height())));
+        });
         // 专用服务端不加载任何 Minecraft 客户端或渲染类。
         if (FMLEnvironment.dist == Dist.CLIENT) ClientBootstrap.init(bus, container);
     }

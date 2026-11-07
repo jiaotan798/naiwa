@@ -740,8 +740,8 @@ public final class NaiwaGameplayTests {
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
             noFishingActor(h,p,"收竿事件监听尚未结束时也不能提前入网");
-            h.assertTrue(NaiwaPranks.stealFishingCatch(event),"事件结束后的结算点成功出场才截走渔获");
-            h.assertTrue(!NaiwaPranks.stealFishingCatch(event),"重复通知不能截走第二次渔获或重复生成");
+            h.assertTrue(NaiwaNeoForgePranks.stealFishingCatch(event),"事件结束后的结算点成功出场才截走渔获");
+            h.assertTrue(!NaiwaNeoForgePranks.stealFishingCatch(event),"重复通知不能截走第二次渔获或重复生成");
             h.assertTrue(!event.isCanceled() && event.getDrops().size()==1 && event.getRodDamage()==1,"不改事件副本和耐久，由原版取消分支结算一次");hook.discard();
         });
         h.runAfterDelay(28,()->{
@@ -793,7 +793,7 @@ public final class NaiwaGameplayTests {
             noFishingActor(h,p,"咬钩下沉动画期间不能提前出场");
             var event=new net.neoforged.neoforge.event.entity.player.ItemFishedEvent(List.of(new ItemStack(Items.COD)),1,hook);
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
-            h.assertTrue(NaiwaPranks.stealFishingCatch(event),"下沉浮漂仍可安全出场并截走渔获");
+            h.assertTrue(NaiwaNeoForgePranks.stealFishingCatch(event),"下沉浮漂仍可安全出场并截走渔获");
             hook.discard();
         });
         h.runAfterDelay(30,()->{NaiwaEntity frog=actor(p);h.assertTrue(frog.getY()>=pool.getY()-1-.001,"按水面找起跳点，不能因浮漂下沉而生在池底");face(p,frog.getEyePosition());});
@@ -852,7 +852,7 @@ public final class NaiwaGameplayTests {
             var event=new net.neoforged.neoforge.event.entity.player.ItemFishedEvent(List.of(new ItemStack(Items.COD)),1,hook);
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
             // 模拟后执行的其他监听器取消收竿；待整个事件结束后读取最终结果，不能在 LOWEST 中抢先出场。
-            event.setCanceled(true);h.assertTrue(!NaiwaPranks.stealFishingCatch(event),"最终被取消的事件不能出场或截走奖励");hook.discard();
+            event.setCanceled(true);h.assertTrue(!NaiwaNeoForgePranks.stealFishingCatch(event),"最终被取消的事件不能出场或截走奖励");hook.discard();
         });
         h.runAfterDelay(30,()->done(h,p,()->noFishingActor(h,p,"收竿被取消后不能补发演员")));
     }
@@ -860,7 +860,7 @@ public final class NaiwaGameplayTests {
     @GameTest(template="empty",timeoutTicks=60)
     public static void emptyFishingLootNeverStartsPrank(GameTestHelper h) {
         ServerPlayer p=player(h);var hook=fishingHook(h,p);
-        h.runAfterDelay(25,()->{var event=new net.neoforged.neoforge.event.entity.player.ItemFishedEvent(List.of(),1,hook);h.assertTrue(!NaiwaPranks.stealFishingCatch(event),"空渔获不走抢书结算");hook.discard();});
+        h.runAfterDelay(25,()->{var event=new net.neoforged.neoforge.event.entity.player.ItemFishedEvent(List.of(),1,hook);h.assertTrue(!NaiwaNeoForgePranks.stealFishingCatch(event),"空渔获不走抢书结算");hook.discard();});
         h.runAfterDelay(30,()->done(h,p,()->noFishingActor(h,p,"无有效渔获时不补发假成功")));
     }
 
@@ -868,7 +868,7 @@ public final class NaiwaGameplayTests {
     public static void shallowFishingCatchNeverSpawnsInFloor(GameTestHelper h) {
         ServerPlayer p=player(h);var hook=fishingHook(h,p);BlockPos pool=BlockPos.containing(p.position().add(0,0,4)).below();
         for(int x=-2;x<=2;x++)for(int z=-1;z<=2;z++)h.getLevel().setBlock(pool.offset(x,-1,z),Blocks.STONE.defaultBlockState(),2);
-        h.runAfterDelay(25,()->{var event=new net.neoforged.neoforge.event.entity.player.ItemFishedEvent(List.of(new ItemStack(Items.COD)),1,hook);h.assertTrue(!NaiwaPranks.stealFishingCatch(event)&&event.getDrops().getFirst().is(Items.COD),"浅水拒绝整蛊，保留正常渔获");hook.discard();});
+        h.runAfterDelay(25,()->{var event=new net.neoforged.neoforge.event.entity.player.ItemFishedEvent(List.of(new ItemStack(Items.COD)),1,hook);h.assertTrue(!NaiwaNeoForgePranks.stealFishingCatch(event)&&event.getDrops().getFirst().is(Items.COD),"浅水拒绝整蛊，保留正常渔获");hook.discard();});
         h.runAfterDelay(30,()->done(h,p,()->noFishingActor(h,p,"浅水仍拒绝演员，不因调整时序而放宽身体空间")));
     }
 

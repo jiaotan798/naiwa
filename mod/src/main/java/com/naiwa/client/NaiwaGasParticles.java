@@ -1,20 +1,22 @@
 package com.naiwa.client;
 
-import com.naiwa.Naiwa;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.particle.TextureSheetParticle;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
 
 /** 笑气破碎的五秒气团与表情；复用原版粒子透明通道，按网易公式控制生长、淡入淡出和弱反弹。 */
 final class NaiwaGasParticles {
     private NaiwaGasParticles() {}
-    static void register(RegisterParticleProvidersEvent event) {
-        event.registerSpriteSet(Naiwa.GAS_CLOUD.get(),sprites->(type,level,x,y,z,dx,dy,dz)->new GasParticle(level,x,y,z,sprites,false));
-        event.registerSpriteSet(Naiwa.GAS_FACE.get(),sprites->(type,level,x,y,z,dx,dy,dz)->new GasParticle(level,x,y,z,sprites,true));
+    static ParticleProvider<SimpleParticleType> cloud(SpriteSet sprites) {
+        return (type,level,x,y,z,dx,dy,dz)->new GasParticle(level,x,y,z,sprites,false);
+    }
+    static ParticleProvider<SimpleParticleType> face(SpriteSet sprites) {
+        return (type,level,x,y,z,dx,dy,dz)->new GasParticle(level,x,y,z,sprites,true);
     }
 
     /** 20 Hz 下五秒为 100 tick；前 0.1 秒淡入、末 1.5 秒淡出，气团在前 1.2 秒长大。 */

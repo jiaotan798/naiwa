@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.naiwa.Naiwa;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
@@ -15,12 +16,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import java.util.IdentityHashMap;
-import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.neoforge.client.event.ViewportEvent;
-import net.neoforged.neoforge.client.event.RegisterShadersEvent;
-import net.neoforged.neoforge.common.NeoForge;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import com.mojang.blaze3d.platform.GlStateManager;
@@ -38,12 +33,16 @@ public final class NaiwaAscensionVisuals {
     private NaiwaAscensionVisuals() {}
 
     /** 独立透明着色器保留连续 alpha，不让光影把圣光归类为信标或发光实体后裁出硬边。 */
-    static void shaders(RegisterShadersEvent event) {
+    static void shaders(ShaderRegistration registrar) throws java.io.IOException {
         NaiwaAscensionBloom.close();
         closeBuffers();
-        try {event.registerShader(new NaiwaWorldShader(event.getResourceProvider(),ResourceLocation.fromNamespaceAndPath("naiwa","holy_light"),DefaultVertexFormat.POSITION_TEX_COLOR),loaded->shader=loaded);
-            NaiwaModel.shaders(event);}
-        catch(java.io.IOException failure){throw new java.io.UncheckedIOException("无法加载奶蛙圣光着色器",failure);}
+        registrar.register(ResourceLocation.fromNamespaceAndPath("naiwa","holy_light"),DefaultVertexFormat.POSITION_TEX_COLOR,loaded->shader=loaded);
+        NaiwaModel.shaders(registrar);
+    }
+
+    @FunctionalInterface
+    interface ShaderRegistration {
+        void register(ResourceLocation id, VertexFormat format, java.util.function.Consumer<ShaderInstance> loaded) throws java.io.IOException;
     }
 
     static boolean worldPass() {return worldPass;}
@@ -54,17 +53,12 @@ public final class NaiwaAscensionVisuals {
                 &&!mc.player.isSpectator()&&mc.player.hasEffect(Naiwa.ASCENDING);
     }
 
-    static void register() {
-        NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event)->{refresh();tickFlights();});
-        NeoForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut event)->{
-            if(STATE.update(null,-1,0))Minecraft.getInstance().gameRenderer.lightTexture().tick();
-            FLIGHTS.clear();world=null;
-            worldPass=false;NaiwaAscensionBloom.close();closeBuffers();
-        });
-        NeoForge.EVENT_BUS.addListener((ViewportEvent.ComputeFogColor event)->{
-            if(active()) {event.setRed(.012F);event.setGreen(.016F);event.setBlue(.035F);}
-        });
-        NeoForge.EVENT_BUS.addListener(NaiwaAscensionVisuals::render);
+    static void tick() {refresh();tickFlights();}
+
+    static void disconnect() {
+        if(STATE.update(null,-1,0))Minecraft.getInstance().gameRenderer.lightTexture().tick();
+        FLIGHTS.clear();world=null;
+        worldPass=false;NaiwaAscensionBloom.close();closeBuffers();
     }
 
     /** 同步包到达后的第一帧也初始化；结束即使不再绘制圣光，仍刷新缓存光照恢复正常。 */
@@ -76,25 +70,25 @@ public final class NaiwaAscensionVisuals {
             mc.gameRenderer.lightTexture().tick();
     }
 
-    private static void render(RenderLevelStageEvent event) {
-        if(event.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){worldPass=true;return;}
-        if(event.getStage()!=RenderLevelStageEvent.Stage.AFTER_LEVEL)return;
+    static void beginWorldPass() {worldPass=true;}
+
+    /** 使用加载器提供的世界矩阵和相机，确保光影合成后仍按原位置绘制。 */
+    static void render(Camera camera, float partial, Matrix4f modelView, Matrix4f projectionMatrix) {
         worldPass=false;
         if(!active())NaiwaAscensionBloom.close();
         refresh();if(FLIGHTS.isEmpty()||shader==null){closeBuffers();return;}
-        var mc=Minecraft.getInstance();float partial=event.getPartialTick().getGameTimeDeltaPartialTick(false);
+        var mc=Minecraft.getInstance();
         // 光影的天气阶段仍可能绑定其内部 G-buffer；最终世界阶段明确输出到主画布，避免圣光被后续合成覆盖。
         mc.getMainRenderTarget().bindWrite(false);
         // 世界结束后全局矩阵可能已为手部/界面重置；明确使用事件中的世界矩阵，并在绘制后还原。
-        var view=RenderSystem.getModelViewStack();view.pushMatrix();view.set(event.getModelViewMatrix());RenderSystem.applyModelViewMatrix();
+        var view=RenderSystem.getModelViewStack();view.pushMatrix();view.set(modelView);RenderSystem.applyModelViewMatrix();
         var projection=new Matrix4f(RenderSystem.getProjectionMatrix());var sorting=RenderSystem.getVertexSorting();
-        RenderSystem.setProjectionMatrix(event.getProjectionMatrix(),sorting);
+        RenderSystem.setProjectionMatrix(projectionMatrix,sorting);
         try {
         // Iris 的共享实体缓冲会延迟批次，endBatch(type) 也可能为空操作；独立缓冲保证在本阶段提交。
         if(ownedBuffers==null){vertexMemory=new com.mojang.blaze3d.vertex.ByteBufferBuilder(262144);ownedBuffers=net.minecraft.client.renderer.MultiBufferSource.immediate(vertexMemory);}
         var buffers=ownedBuffers;var type=BeamLayer.TYPE;
         try {
-            var camera=event.getCamera();
             // 角色先写入正确深度，之后的透明雨丝和光尘才能被躯干遮挡。
             for(Player player:FLIGHTS.keySet())if(visible(player,camera.getPosition()))NaiwaPlayerRenderer.world(player,partial,camera,buffers);
             var output=buffers.getBuffer(type);

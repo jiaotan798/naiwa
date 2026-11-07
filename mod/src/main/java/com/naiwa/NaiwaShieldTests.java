@@ -147,11 +147,11 @@ public final class NaiwaShieldTests {
             raise(p,shield);
             var damage=new DamageContainer(p.damageSources().generic(),4);
             var canceled=new LivingShieldBlockEvent(p,new DamageContainer(p.damageSources().generic(),4),true); canceled.setCanceled(true);
-            NaiwaShield.block(canceled);
-            NaiwaShield.block(new LivingShieldBlockEvent(p,new DamageContainer(p.damageSources().generic(),4),false));
+            NaiwaNeoForgeGameplay.shieldBlock(canceled);
+            NaiwaNeoForgeGameplay.shieldBlock(new LivingShieldBlockEvent(p,new DamageContainer(p.damageSources().generic(),4),false));
             h.assertTrue(NaiwaShield.charge(shield)==0, "取消或未实际阻挡的事件不计数");
-            NaiwaShield.block(new LivingShieldBlockEvent(p,damage,true));
-            NaiwaShield.block(new LivingShieldBlockEvent(p,damage,true));
+            NaiwaNeoForgeGameplay.shieldBlock(new LivingShieldBlockEvent(p,damage,true));
+            NaiwaNeoForgeGameplay.shieldBlock(new LivingShieldBlockEvent(p,damage,true));
             h.assertTrue(NaiwaShield.charge(shield)==1, "同一次伤害上下文重复回调只能累计一次");
             shield.set(Naiwa.LAUGH_START.get(), h.getLevel().getGameTime());
             var saved=ItemStack.parseOptional(h.getLevel().registryAccess(), (net.minecraft.nbt.CompoundTag)shield.save(h.getLevel().registryAccess()));

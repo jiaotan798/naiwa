@@ -1,0 +1,29 @@
+plugins { id 'net.fabricmc.fabric-loom-remap' version '1.15.5' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+tasks.withType(JavaCompile).configureEach { options.release = 17 }
+tasks.withType(JavaExec).configureEach { javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) } }
+dependencies {
+    minecraft 'com.mojang:minecraft:1.20.1'
+    mappings loom.officialMojangMappings()
+    modImplementation 'net.fabricmc:fabric-loader:0.19.4'
+    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.92.9+1.20.1'
+}
+ext.portGameVersion = '1.20.1'
+ext.portLoader = 'Fabric'
+apply from: '../port.gradle'
+loom { runs { server { programArgs '--nogui' } } }
+if (providers.gradleProperty('clientSmoke').isPresent()) {
+    loom.runs {
+        clientSmoke { client(); runDir 'run-client-smoke'; programArgs '--username','NaiwaPortQA' }
+    }
+}
+remapJar { archiveFileName = "naiwa-${project.version}-Fabric-1.20.1.jar" }
+fabricApi { configureTests { createSourceSet = true; modId = 'naiwa-tests'; enableClientGameTests = false; eula = true } }
+sourceSets.gametest.java.srcDir('../shared-1.20.1/src/gametest/java')
+tasks.named('processGametestResources') {
+    from('../../mod/src/main/resources') {
+        include 'data/naiwa/structure/empty.nbt'
+        eachFile { details -> details.path = details.path.replace('/structure/', '/structures/') }
+    }
+}
+tasks.named('check') { dependsOn 'runGameTest' }

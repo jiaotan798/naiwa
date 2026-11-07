@@ -1,0 +1,99 @@
+{
+  "targets": {
+    "scene": {},
+    "extract": {},
+    "blur_h": {},
+    "blur_v": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "naiwa:post/holy_copy",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main",
+          "bilinear": false
+        }
+      ],
+      "output": "scene"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "naiwa:post/holy_extract",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "scene",
+          "bilinear": true
+        }
+      ],
+      "output": "extract"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "naiwa:post/holy_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "extract",
+          "bilinear": true
+        }
+      ],
+      "output": "blur_h",
+      "uniforms": {
+        "HolyBlurConfig": [
+          {
+            "name": "BlurDirection",
+            "type": "vec2",
+            "value": [
+              0.003,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "naiwa:post/holy_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "blur_h",
+          "bilinear": true
+        }
+      ],
+      "output": "blur_v",
+      "uniforms": {
+        "HolyBlurConfig": [
+          {
+            "name": "BlurDirection",
+            "type": "vec2",
+            "value": [
+              0,
+              0.0053
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "naiwa:post/holy_composite",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "blur_v",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Scene",
+          "target": "scene",
+          "bilinear": false
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

@@ -5,24 +5,19 @@ import java.util.WeakHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.server.ServerStoppedEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /** 持原版盾时的独立相遇入口；只在已加载、可站立且玩家看得见的位置现身。 */
 final class NaiwaEncounters {
     private static final Map<ServerPlayer, Long> NEXT = new WeakHashMap<>();
-    static void registerEvents() {
-        NeoForge.EVENT_BUS.addListener(NaiwaEncounters::tick);
-        NeoForge.EVENT_BUS.addListener((ServerStoppedEvent event) -> NEXT.clear());
-    }
+    static void stopped() {NEXT.clear();}
     /** 等待首次观察持盾后的延迟，失败则延后重试；只有成功现身才进入五分钟间隔。 */
-    private static void tick(ServerTickEvent.Post event) {
-        for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
+    static void tick(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             long now=player.level().getGameTime();
             if (now%20!=0 || !player.isAlive() || player.isSpectator() || NaiwaPranks.busy(player)) continue;
             boolean holding=false;

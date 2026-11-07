@@ -1,15 +1,15 @@
 package com.naiwa.mixin;
 
 import com.naiwa.NaiwaEntity;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
-import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** 原版船由驾驶客户端计算移动；补充停手时的划桨输入，保留原版浮力、碰撞及车辆同步。 */
@@ -41,9 +41,9 @@ abstract class BoatMixin {
                 &&passengers.get(1) instanceof NaiwaEntity frog&&(frog.act().equals("boat")||frog.boatSteering()==4)?frog:null;
     }
 
-    @Redirect(method="clampRotation",at=@At(value="INVOKE",target="Lnet/minecraft/util/Mth;clamp(FFF)F"))
-    private float naiwa$lookBehind(float angle,float min,float max) {
+    @WrapOperation(method="clampRotation",at=@At(value="INVOKE",target="Lnet/minecraft/util/Mth;clamp(FFF)F"))
+    private float naiwa$lookBehind(float angle,float min,float max,Operation<Float> original) {
         // 原版 ±105° 看不到正后座；本轮允许玩家自行回头，大笑期间保留，退场即恢复原限制。
-        return naiwa$boatActor()!=null?Mth.clamp(angle,-180,180):Mth.clamp(angle,min,max);
+        return naiwa$boatActor()!=null?original.call(angle,-180F,180F):original.call(angle,min,max);
     }
 }

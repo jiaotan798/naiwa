@@ -1,5 +1,9 @@
 # 更新记录
 
+## 主分支多加载器适配 — 2026-11-07
+
+加入 1.20.1 Forge／Fabric、1.21.1 Fabric、26.1.2 NeoForge／Fabric 五个构建目标，复用主工程玩法和资源。[构建说明和本轮验证](ports/README.md)
+
 ## 0.4.9 — 2026-11-07
 
 适用 Minecraft Java 1.21.1 / NeoForge 21.1.252 / Java 21。客户端与服务器均需更新，无需新增前置。

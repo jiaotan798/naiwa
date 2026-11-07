@@ -1,0 +1,30 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.naiwa.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "naiwa.forge.refmap.json",
+  "mixins": [
+    "LivingEntityMixin",
+    "MobMixin",
+    "BoatMixin",
+    "FlightNetworkMixin",
+    "LegacyShieldSaveMixin",
+    "ForgeEntityLifecycleMixin",
+    "ForgeFishingHookMixin",
+    "ForgeBlockDropsMixin",
+    "ForgeDamageMixin"
+  ],
+  "client": [
+    "HumanoidModelMixin",
+    "PlayerModelMixin",
+    "LivingRendererMixin",
+    "ItemInHandRendererMixin",
+    "ChestBlockEntityMixin",
+    "AscensionSkyMixin",
+    "IrisWorldTimeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

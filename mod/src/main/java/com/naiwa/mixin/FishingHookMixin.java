@@ -1,6 +1,6 @@
 package com.naiwa.mixin;
 
-import com.naiwa.NaiwaPranks;
+import com.naiwa.NaiwaNeoForgePranks;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.neoforged.neoforge.event.entity.player.ItemFishedEvent;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,6 +14,6 @@ abstract class FishingHookMixin {
     private boolean naiwa$stolenCatch(ItemFishedEvent event) {
         // NeoForge 的 getDrops() 是副本，清空它拦不住原版掉落；复用原版取消分支，保留收漂和 getRodDamage()。
         // 此时所有监听器已执行，且只会在真正咬钩后的收竿进入；不能在等待/咬钩动画期间生成演员。
-        return event.isCanceled() || NaiwaPranks.stealFishingCatch(event);
+        return event.isCanceled() || NaiwaNeoForgePranks.stealFishingCatch(event);
     }
 }

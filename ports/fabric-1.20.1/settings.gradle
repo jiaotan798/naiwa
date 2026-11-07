@@ -1,0 +1,2 @@
+pluginManagement { repositories { maven { url = 'https://maven.fabricmc.net/' }; gradlePluginPortal() } }
+rootProject.name = 'naiwa-fabric-1.20.1'

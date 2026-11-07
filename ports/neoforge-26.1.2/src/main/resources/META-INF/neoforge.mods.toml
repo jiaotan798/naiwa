@@ -1,0 +1,22 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+[[mods]]
+modId="naiwa"
+version="${version}"
+displayName="奶蛙"
+description="奶蛙、十种生存整蛊、笑气瓶、奶蛙盾与图腾飞升。"
+[[mixins]]
+config="naiwa.mixins.json"
+[[dependencies.naiwa]]
+modId="neoforge"
+type="required"
+versionRange="[26.1.2.94,)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.naiwa]]
+modId="minecraft"
+type="required"
+versionRange="[26.1.2]"
+ordering="NONE"
+side="BOTH"

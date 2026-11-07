@@ -15,4 +15,5 @@
 assets/runtime/** -text
 # 生产资源按原字节进入 JAR，避免配方或材质换行转换使独立构建摘要偏离正式包。
 mod/src/main/resources/** -text whitespace=cr-at-eol
+ports/**/src/**/resources/** -text whitespace=cr-at-eol
 validation/*-gametest.txt -text

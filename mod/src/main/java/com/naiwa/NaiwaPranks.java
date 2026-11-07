@@ -7,6 +7,7 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -25,18 +26,6 @@ import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.player.ItemFishedEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.server.ServerStoppedEvent;
-import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.BlockDropsEvent;
 
 /** 十种整蛊共用调度；钓鱼截走渔获，钻石整蛊暂存真实掉落并在演员退场时原数交还。 */
 public final class NaiwaPranks {
@@ -54,63 +43,61 @@ public final class NaiwaPranks {
     private record Attention(Vec3 position,Vec3 look,long since) {}
     private NaiwaPranks() {}
 
-    public static void registerEvents() {
-        NeoForge.EVENT_BUS.addListener(NaiwaPranks::tick);
-        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, (LivingDeathEvent e) -> {
-            if (e.getEntity() instanceof ServerPlayer p) {
-                cancel(p); NaiwaGameplay.cleanup(p);
-                // 与临时场景分开记录；只有真正进入死亡流程才安排复活点嘲笑。
-                p.getPersistentData().putBoolean(RESPAWN,true);
-            }
-        });
-        NeoForge.EVENT_BUS.addListener((PlayerEvent.Clone e) -> {
-            var from=e.getOriginal().getPersistentData(); var to=e.getEntity().getPersistentData();
-            to.putLong(NEXT,from.getLong(NEXT)); to.putString(LAST,from.getString(LAST));
-            if (e.isWasDeath() && from.getBoolean(RESPAWN)) to.putBoolean(RESPAWN,true);
-        });
-        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedOutEvent e) -> cancel((ServerPlayer)e.getEntity()));
-        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerChangedDimensionEvent e) -> cancel((ServerPlayer)e.getEntity()));
-        NeoForge.EVENT_BUS.addListener((PlayerInteractEvent.RightClickBlock e) -> {
-            if (e.getEntity() instanceof ServerPlayer p && e.getHand()==InteractionHand.MAIN_HAND
-                    && e.getLevel().getBlockState(e.getPos()).is(BlockTags.WOODEN_DOORS)) DOORS.put(p.getUUID(),e.getPos().immutable());
-            if(!e.isCanceled() && e.getEntity() instanceof ServerPlayer p && e.getHand()==InteractionHand.MAIN_HAND
-                    && e.getLevel().getBlockEntity(e.getPos()) instanceof ChestBlockEntity) CHESTS.put(p.getUUID(),e.getPos().immutable());
-        });
-        NeoForge.EVENT_BUS.addListener((PlayerContainerEvent.Close e) -> {
-            if(!(e.getEntity() instanceof ServerPlayer p))return;
-            BlockPos pos=CHESTS.remove(p.getUUID());
-            if(pos!=null && ready(p) && chestMenu(p,e.getContainer(),pos))CLOSED_CHESTS.put(p.getUUID(),new ClosedChest(pos,p.level().getGameTime()));
-        });
-        NeoForge.EVENT_BUS.addListener((PlayerInteractEvent.LeftClickBlock e) -> {
-            if (!(e.getEntity() instanceof ServerPlayer p)) return;
-            Scene active=SCENES.get(p.getUUID());
-            if (active!=null && active.kind.equals("mine")) {active.lastDig=p.level().getGameTime(); return;}
-            if (!ready(p)) return;
-            if (p.level().getBlockState(e.getPos()).is(BlockTags.LOGS)) startBlock(p,"tree",e.getPos());
-            // 钻石矿留给真实掉落事件决定整蛊，不能起镐时被摸鱼场景抢走同一轮调度。
-            else if (!p.level().getBlockState(e.getPos()).is(BlockTags.DIAMOND_ORES)&&!p.level().canSeeSky(p.blockPosition()) && p.getMainHandItem().is(net.minecraft.tags.ItemTags.PICKAXES)) startBlock(p,"mine",e.getPos());
-        });
-        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST,(BlockEvent.BreakEvent e)->{
-            if(e.isCanceled()||!(e.getPlayer() instanceof ServerPlayer p))return;
-            Scene scene=SCENES.get(p.getUUID());
-            if(scene!=null&&scene.kind.equals("mine")&&p.getMainHandItem().is(net.minecraft.tags.ItemTags.PICKAXES)) {
-                // 事件之后仍可能被其他监听者取消；在 tick 中确认方块实际变化，不能只挥镐就发出露馅提示。
-                scene.pendingMinedBlock=e.getPos().immutable();scene.pendingMinedState=e.getState();
-            }
-        });
-        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST,NaiwaPranks::diamondDrops);
-        NeoForge.EVENT_BUS.addListener((ServerStoppingEvent e)->{
-            // 在最终世界保存前结算暂存钻石，不能等停服保存完才生成返还物。
-            for(Scene scene:SCENES.values())scene.close();SCENES.clear();MOCK_CANDIDATES.clear();
-        });
-        NeoForge.EVENT_BUS.addListener((ServerStoppedEvent e) -> {
-            for (Scene scene:SCENES.values()) scene.close();
-            SCENES.clear();MOCK_CANDIDATES.clear(); DOORS.clear();CHESTS.clear();CLOSED_CHESTS.clear();ATTENTION.clear();
-        });
+    /** 仅实际死亡才写入复活点待办，并先结束飞升和普通整蛊。 */
+    static void died(ServerPlayer player) {
+        cancel(player);
+        NaiwaGameplay.cleanup(player);
+        NaiwaPlatform.playerData(player).putBoolean(RESPAWN,true);
+    }
+
+    static void copySchedule(net.minecraft.world.entity.player.Player original, net.minecraft.world.entity.player.Player replacement, boolean died) {
+        var from=NaiwaPlatform.playerData(original); var to=NaiwaPlatform.playerData(replacement);
+        to.putLong(NEXT,from.getLong(NEXT)); to.putString(LAST,from.getString(LAST));
+        if (died && from.getBoolean(RESPAWN)) to.putBoolean(RESPAWN,true);
+    }
+
+    static void usedBlock(ServerPlayer player, BlockPos pos, boolean cancelled) {
+        if (player.level().getBlockState(pos).is(BlockTags.WOODEN_DOORS)) DOORS.put(player.getUUID(),pos.immutable());
+        if (!cancelled && player.level().getBlockEntity(pos) instanceof ChestBlockEntity) CHESTS.put(player.getUUID(),pos.immutable());
+    }
+
+    public static void closedMenu(ServerPlayer player, net.minecraft.world.inventory.AbstractContainerMenu menu) {
+        BlockPos pos=CHESTS.remove(player.getUUID());
+        if(pos!=null && ready(player) && chestMenu(player,menu,pos))CLOSED_CHESTS.put(player.getUUID(),new ClosedChest(pos,player.level().getGameTime()));
+    }
+
+    static void attackedBlock(ServerPlayer player, BlockPos pos) {
+        Scene active=SCENES.get(player.getUUID());
+        if (active!=null && active.kind.equals("mine")) {active.lastDig=player.level().getGameTime(); return;}
+        if (!ready(player)) return;
+        var state=player.level().getBlockState(pos);
+        if (state.is(BlockTags.LOGS)) startBlock(player,"tree",pos);
+        // 钻石矿留给真实掉落决定整蛊，不能起镐时被摸鱼场景抢走同一轮调度。
+        else if (!state.is(BlockTags.DIAMOND_ORES) && !player.level().canSeeSky(player.blockPosition())
+                && player.getMainHandItem().is(net.minecraft.tags.ItemTags.PICKAXES)) startBlock(player,"mine",pos);
+    }
+
+    /** 先暂记矿点，下一 tick 核实方块确实变化，兼容其他监听器取消挖掘。 */
+    static void breakingBlock(ServerPlayer player, BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+        Scene scene=SCENES.get(player.getUUID());
+        if(scene!=null && scene.kind.equals("mine") && player.getMainHandItem().is(net.minecraft.tags.ItemTags.PICKAXES)) {
+            scene.pendingMinedBlock=pos.immutable();scene.pendingMinedState=state;
+        }
+    }
+
+    /** 停服时应在最终保存前结算暂存钻石；清理可重复调用。 */
+    static void closeScenes() {
+        for(Scene scene:SCENES.values())scene.close();
+        SCENES.clear();MOCK_CANDIDATES.clear();
+    }
+
+    static void stopped() {
+        closeScenes();
+        DOORS.clear();CHESTS.clear();CLOSED_CHESTS.clear();ATTENTION.clear();
     }
 
     /** 复活和图腾落地待办也占用调度，前方受阻时不能被另一种整蛊抢走出场。 */
-    public static boolean busy(ServerPlayer p) {return SCENES.containsKey(p.getUUID()) || p.getPersistentData().getBoolean(RESPAWN) || p.hasEffect(Naiwa.ASCENDING) || NaiwaGameplay.waitingForTotemLanding(p);}
+    public static boolean busy(ServerPlayer p) {return SCENES.containsKey(p.getUUID()) || NaiwaPlatform.playerData(p).getBoolean(RESPAWN) || p.hasEffect(Naiwa.ASCENDING) || NaiwaGameplay.waitingForTotemLanding(p);}
     /** 归属提示只定位场景，再按实体实例确认；取消、换场和重载后旧提示不会继续占用演员身份。 */
     public static boolean isActor(NaiwaEntity frog) {
         Scene scene=frog==null?null:SCENES.get(frog.prankOwner);
@@ -139,24 +126,24 @@ public final class NaiwaPranks {
     private static boolean shield(ServerPlayer p) {return p.getMainHandItem().is(Items.SHIELD)||p.getOffhandItem().is(Items.SHIELD);}
     private static boolean ready(ServerPlayer p) {
         if (!p.isAlive() || p.isSpectator() || busy(p) || shield(p)) return false;
-        long now=p.level().getGameTime(); var data=p.getPersistentData();
+        long now=p.level().getGameTime(); var data=NaiwaPlatform.playerData(p);
         if (!data.contains(NEXT)) {data.putLong(NEXT,now+200); return false;}
         return now>=data.getLong(NEXT);
     }
     private static boolean allowed(ServerPlayer p,String kind) {
-        return NaiwaConfig.ALLOW_CONSECUTIVE_SAME_PRANK.get() || !p.getPersistentData().getString(LAST).equals(kind);
+        return NaiwaConfig.allowConsecutive() || !NaiwaPlatform.playerData(p).getString(LAST).equals(kind);
     }
 
-    private static void tick(ServerTickEvent.Post e) {
-        for (ServerPlayer p:e.getServer().getPlayerList().getPlayers()) {
+    static void tick(MinecraftServer server) {
+        for (ServerPlayer p:server.getPlayerList().getPlayers()) {
             Scene active=SCENES.get(p.getUUID());
             if (active!=null) {
                 if (!p.isAlive() || p.isSpectator() || active.frog.level()!=p.level() || !active.tick(p)) cancel(p);
                 continue;
             }
-            if (p.isAlive() && p.getPersistentData().getBoolean(RESPAWN)) {
+            if (p.isAlive() && NaiwaPlatform.playerData(p).getBoolean(RESPAWN)) {
                 // 仅在正前方成功入场后消费；受阻期间等待当前位置和朝向变化，不启动其他整蛊。
-                if(mock(p))p.getPersistentData().remove(RESPAWN);
+                if(mock(p))NaiwaPlatform.playerData(p).remove(RESPAWN);
                 continue;
             }
             BlockPos door=DOORS.remove(p.getUUID());
@@ -237,16 +224,8 @@ public final class NaiwaPranks {
         return true;
     }
 
-    /** 使用已计算的原版掉落，保留时运数量和物品组件；不取消经验、精准采集或其它掉落。 */
-    private static void diamondDrops(BlockDropsEvent event) {
-        if(event.isCanceled()||!(event.getBreaker() instanceof ServerPlayer p)||!event.getState().is(BlockTags.DIAMOND_ORES)
-                ||!event.getTool().is(net.minecraft.tags.ItemTags.PICKAXES))return;
-        var diamonds=event.getDrops().stream().filter(item->item.getItem().is(Items.DIAMOND)).toList();
-        if(!diamonds.isEmpty()&&startDiamond(p,diamonds.stream().map(item->item.getItem().copy()).toList()))event.getDrops().removeAll(diamonds);
-    }
-
     /** 矿点附近先找完整安全路线；成功入网后才接管真实钻石，不满足条件就让原版正常掉落。 */
-    static boolean startDiamond(ServerPlayer p,List<ItemStack> diamonds) {
+    public static boolean startDiamond(ServerPlayer p,List<ItemStack> diamonds) {
         if(diamonds.isEmpty()||diamonds.stream().anyMatch(stack->stack.isEmpty()||!stack.is(Items.DIAMOND))
                 ||!ready(p)||!allowed(p,"diamond")||!p.onGround()||p.isInWater())return false;
         Vec3 facing=Vec3.directionFromRotation(0,p.getYRot());
@@ -294,11 +273,10 @@ public final class NaiwaPranks {
     }
 
     /** 仅供原版收竿结算点调用：事件全部结束且演员成功入网才返回 true，通知原版截走渔获并照常扣一次耐久。 */
-    public static boolean stealFishingCatch(ItemFishedEvent caught) {
-        if (caught.isCanceled() || !(caught.getEntity() instanceof ServerPlayer p) || !ready(p) || !allowed(p,"fish")) return false;
-        FishingHook hook=caught.getHookEntity();
+    public static boolean stealFishingCatch(ServerPlayer p, FishingHook hook, List<ItemStack> drops) {
+        if (!ready(p) || !allowed(p,"fish")) return false;
         if (!hook.isAlive() || hook.getPlayerOwner()!=p || hook.level()!=p.level()
-                || p.distanceToSqr(hook)>=144 || caught.getDrops().stream().noneMatch(stack->!stack.isEmpty())) return false;
+                || p.distanceToSqr(hook)>=144 || drops.stream().noneMatch(stack->!stack.isEmpty())) return false;
         var level=p.serverLevel();BlockPos surface=hook.blockPosition();
         if (!level.hasChunkAt(surface)) return false;
         // 咬钩会让浮漂下沉；按真实水面还原两格深的起跳空间，不再用“浮漂减 1.2”把演员压进池底。
@@ -403,10 +381,10 @@ public final class NaiwaPranks {
 
     private static Scene begin(ServerPlayer p,String kind,NaiwaEntity frog,BlockPos anchor) {
         Scene scene=new Scene(p,kind,frog,anchor,p.level().getGameTime()); SCENES.put(p.getUUID(),scene);
-        p.getPersistentData().putString(LAST,kind);
+        NaiwaPlatform.playerData(p).putString(LAST,kind);
         // 开始时固定本轮等待，重载设置不重置已排定冷却；零间隔也由 SCENES 保证同一玩家不会重叠演出。
-        p.getPersistentData().putLong(NEXT,p.level().getGameTime()+NaiwaConfig.nextIntervalTicks(p.getRandom()));
-        if(frog.isAddedToLevel())p.serverLevel().sendParticles(ParticleTypes.POOF,frog.getX(),frog.getY()+1,frog.getZ(),10,.3,.5,.3,.01);
+        NaiwaPlatform.playerData(p).putLong(NEXT,p.level().getGameTime()+NaiwaConfig.nextIntervalTicks(p.getRandom()));
+        if(NaiwaPlatform.isInLevel(frog))p.serverLevel().sendParticles(ParticleTypes.POOF,frog.getX(),frog.getY()+1,frog.getZ(),10,.3,.5,.3,.01);
         return scene;
     }
     /** 先验证安全站位再创建演员并消费间隔；矿洞按玩家身后选点，门和树按目标另一侧选点。 */
@@ -620,7 +598,7 @@ public final class NaiwaPranks {
                 case "diamond" -> {
                     if(decoy==null||!decoy.isAlive()||!safe(p.serverLevel(),land,true))return false;
                     if(decoy.exposed()) {
-                        decoy.setInvisible(true);if(!frog.isAddedToLevel()&&!p.serverLevel().addFreshEntity(frog))return false;
+                        decoy.setInvisible(true);if(!NaiwaPlatform.isInLevel(frog)&&!p.serverLevel().addFreshEntity(frog))return false;
                         failed=now;frog.setAct("diamond_caught");frog.play("idle");break;
                     }
                     if(escapeStart>=0&&now-escapeStart>=80) {
@@ -752,7 +730,7 @@ public final class NaiwaPranks {
             return true;
         }
         void close() {
-            Vec3 refund=decoy!=null&&!frog.isAddedToLevel()?decoy.position():frog.position();
+            Vec3 refund=decoy!=null&&!NaiwaPlatform.isInLevel(frog)?decoy.position():frog.position();
             frog.setBoatSteering(0);
             frog.setScopeViewer(-1);
             frog.stopRiding();

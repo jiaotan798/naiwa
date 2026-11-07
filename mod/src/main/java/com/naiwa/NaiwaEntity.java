@@ -94,19 +94,12 @@ public final class NaiwaEntity extends PathfinderMob {
     }
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
-        if(ACT.equals(key)) {refreshDimensions();updateChestPeeker();}
+        if(ACT.equals(key)) {refreshDimensions();updateChestPeeker(NaiwaPlatform.isInLevel(this));}
     }
-    /** 动作包可以先于或后于入场到达；两个入口都更新集合，同一 ID 重复登记不会累计。 */
-    @Override public void onAddedToLevel() {
-        super.onAddedToLevel();updateChestPeeker();
-    }
-    /** 卸载、退场和换维度均释放旧世界登记，不等待下一 tick；仅保留原版箱盖恢复行为。 */
-    @Override public void onRemovedFromLevel() {
-        super.onRemovedFromLevel();updateChestPeeker();
-    }
-    private void updateChestPeeker() {
+    /** 动作与入场先后顺序不固定，两处都更新集合；离开世界时立即清除旧 ID。 */
+    public void updateChestPeeker(boolean added) {
         synchronized(CHEST_PEEKERS) {
-            if(isAddedToLevel() && act().equals("chest_peek")) {
+            if(added && act().equals("chest_peek")) {
                 CHEST_PEEKERS.computeIfAbsent(level(),key->new java.util.HashSet<>()).add(getId());
             } else {
                 var actors=CHEST_PEEKERS.get(level());

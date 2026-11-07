@@ -4,6 +4,7 @@ build/
 bin/
 out/
 /mod/run*/
+/ports/*/run*/
 logs/
 crash-reports/
 *.log

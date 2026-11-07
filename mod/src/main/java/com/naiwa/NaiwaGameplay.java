@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.tags.DamageTypeTags;
@@ -27,19 +28,6 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.stats.Stats;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.world.level.gameevent.GameEvent;
-import net.neoforged.neoforge.common.CommonHooks;
-import net.neoforged.neoforge.common.EffectCures;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
-import net.neoforged.neoforge.event.entity.living.LivingFallEvent;
-import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
-import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
 /** 笑气携带、图腾飞升及落地后嘲笑。演出待办不落盘，未完成的免摔保护单独保存。 */
 public final class NaiwaGameplay {
@@ -60,43 +48,36 @@ public final class NaiwaGameplay {
     private NaiwaGameplay() {}
     private static ResourceLocation id(String value) {return ResourceLocation.fromNamespaceAndPath(Naiwa.ID, value);}
 
-    public static void registerEvents() {
-        NeoForge.EVENT_BUS.addListener(NaiwaGameplay::tick);
-        NeoForge.EVENT_BUS.addListener((AttackEntityEvent e) -> {if (e.getEntity().hasEffect(Naiwa.LAUGHING)) e.setCanceled(true);});
-        NeoForge.EVENT_BUS.addListener((PlayerInteractEvent.RightClickItem e) -> {
-            if (e.getEntity().hasEffect(Naiwa.LAUGHING) && attackingItem(e.getItemStack())) e.setCanceled(true);
-        });
-        NeoForge.EVENT_BUS.addListener((LivingIncomingDamageEvent e) -> {
-            // 既阻止新的追击，也兜住已经挥出的近战及以生物为来源的箭矢、魔法或爆炸；不改全局无敌标志。
-            if(e.getEntity() instanceof ServerPlayer p&&protectedFromMobs(p)
-                    &&(e.getSource().getEntity() instanceof Mob||e.getSource().getDirectEntity() instanceof Mob))e.setCanceled(true);
-            if (e.getSource().getEntity() instanceof LivingEntity source && e.getSource().getDirectEntity()==source && source.hasEffect(Naiwa.LAUGHING)) e.setCanceled(true);
-        });
-        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST,(LivingChangeTargetEvent e)->{
-            if(e.getEntity() instanceof Mob&&e.getNewAboutToBeSetTarget() instanceof ServerPlayer p&&protectedFromMobs(p))
-                // 取消事件会保留旧目标；改为 null 才能覆盖旧目标也恰好是受保护玩家的情况。
-                e.setNewAboutToBeSetTarget(null);
-        });
-        NeoForge.EVENT_BUS.addListener((LivingDamageEvent.Post e) -> {
-            // 只在实际扣血后解除怪物控制；护甲完全吸收或被取消的攻击不解除。
-            if (!(e.getEntity() instanceof net.minecraft.world.entity.player.Player) && e.getNewDamage() > 0) e.getEntity().removeEffect(Naiwa.LAUGHING);
-        });
-        NeoForge.EVENT_BUS.addListener((LivingFallEvent e) -> {
-            if (e.getEntity() instanceof ServerPlayer p && (FLIGHTS.containsKey(p.getUUID()) || p.getPersistentData().getBoolean(SAFE_FALL))) {
-                e.setCanceled(true);
-                if (!FLIGHTS.containsKey(p.getUUID())) p.getPersistentData().remove(SAFE_FALL);
-            }
-        });
-        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedOutEvent e) -> cleanup((ServerPlayer)e.getEntity()));
-        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerChangedDimensionEvent e) -> cleanup((ServerPlayer)e.getEntity()));
-        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent e) -> cleanup((ServerPlayer)e.getEntity()));
-        NeoForge.EVENT_BUS.addListener((PlayerEvent.Clone e) -> {
-            if (!e.isWasDeath() && e.getOriginal().getPersistentData().getBoolean(SAFE_FALL)) e.getEntity().getPersistentData().putBoolean(SAFE_FALL,true);
-        });
-        NeoForge.EVENT_BUS.addListener((ServerStoppedEvent e) -> {
-            for (ServerPlayer p:e.getServer().getPlayerList().getPlayers()) cleanup(p);
-            FLIGHTS.clear(); LEAKS.clear(); LANDING_MOCKS.clear(); MOB_PROTECTION.clear();
-        });
+    /** 覆盖飞升时已经发出的怪物攻击，以及仍在大笑的生物发起的直接近战。 */
+    public static boolean blocksDamage(LivingEntity victim, DamageSource damage) {
+        var attacker = damage.getEntity();
+        var direct = damage.getDirectEntity();
+        return (victim instanceof ServerPlayer player && protectedFromMobs(player) && (attacker instanceof Mob || direct instanceof Mob))
+                || (attacker instanceof LivingEntity living && direct == living && living.hasEffect(Naiwa.LAUGHING));
+    }
+
+    /** 仅真实扣血才解除怪物的大笑；被取消或完全抵消的伤害不能解除。 */
+    public static void afterDamage(LivingEntity entity, float healthDamage) {
+        if (!(entity instanceof net.minecraft.world.entity.player.Player) && healthDamage > 0) entity.removeEffect(Naiwa.LAUGHING);
+    }
+
+    /** 飞升期间持续免摔；飞升结束后只抵消一次实际的摔落结算。 */
+    public static boolean blocksFall(LivingEntity entity) {
+        if (!(entity instanceof ServerPlayer player)) return false;
+        if (FLIGHTS.containsKey(player.getUUID())) return true;
+        var data = NaiwaPlatform.playerData(player);
+        if (!data.getBoolean(SAFE_FALL)) return false;
+        data.remove(SAFE_FALL);
+        return true;
+    }
+
+    static void copyFallProtection(net.minecraft.world.entity.player.Player original, net.minecraft.world.entity.player.Player replacement, boolean died) {
+        if (!died && NaiwaPlatform.playerData(original).getBoolean(SAFE_FALL)) NaiwaPlatform.playerData(replacement).putBoolean(SAFE_FALL, true);
+    }
+
+    static void stopped(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) cleanup(player);
+        FLIGHTS.clear(); LEAKS.clear(); LANDING_MOCKS.clear(); MOB_PROTECTION.clear();
     }
 
     /** 可移动的大笑不改玩家移动能力；怪物 AI 由 MobMixin 暂停，效果由原版正常计时并同步。 */
@@ -108,7 +89,7 @@ public final class NaiwaGameplay {
     }
 
     /** 允许举盾、进食与普通交互；暂停武器蓄力及攻击性投掷，已离手投掷物照常结算。 */
-    private static boolean attackingItem(ItemStack stack) {
+    static boolean attackingItem(ItemStack stack) {
         var item=stack.getItem();
         return item instanceof net.minecraft.world.item.ProjectileWeaponItem || item instanceof net.minecraft.world.item.ProjectileItem
                 || item instanceof net.minecraft.world.item.TridentItem;
@@ -129,15 +110,15 @@ public final class NaiwaGameplay {
     }
 
     /** 飞升恢复后继续等待实体地面；模型超时结束、入水或载具接触均不能提前播放落地嘲笑。 */
-    private static void tick(ServerTickEvent.Post event) {
+    static void tick(MinecraftServer server) {
         // 同世界相近玩家共用空间查询；远处分组的包围盒过大时回退逐玩家查询，不扫描中间大片无关区域。
         Map<net.minecraft.server.level.ServerLevel,java.util.List<ServerPlayer>> protectedPlayers=null;
-        for(ServerPlayer p:event.getServer().getPlayerList().getPlayers())if(p.level().getGameTime()%20==0&&protectedFromMobs(p)) {
+        for(ServerPlayer p:server.getPlayerList().getPlayers())if(p.level().getGameTime()%20==0&&protectedFromMobs(p)) {
             if(protectedPlayers==null)protectedPlayers=new java.util.IdentityHashMap<>();
             protectedPlayers.computeIfAbsent(p.serverLevel(),key->new java.util.ArrayList<>()).add(p);
         }
         if(protectedPlayers!=null)for(var players:protectedPlayers.values())clearMobTargets(players);
-        for (ServerPlayer p : event.getServer().getPlayerList().getPlayers()) {
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (!p.isAlive() || p.isSpectator()) {cleanup(p); continue;}
             Long protection=MOB_PROTECTION.get(p.getUUID());
             if(protection!=null&&p.level().getGameTime()>=protection)MOB_PROTECTION.remove(p.getUUID());
@@ -148,7 +129,7 @@ public final class NaiwaGameplay {
                 else continue;
             }
             // 等待正前方净空不能延长免摔资格；首次落地或入水仍按原规则独立消耗。
-            if (p.onGround() || p.isInWater()) p.getPersistentData().remove(SAFE_FALL);
+            if (p.onGround() || p.isInWater()) NaiwaPlatform.playerData(p).remove(SAFE_FALL);
             if (waitingForTotemLanding(p)) {
                 long now=p.level().getGameTime(),landed=LANDING_MOCKS.get(p.getUUID());
                 if (onSolidGround(p)) {
@@ -180,7 +161,7 @@ public final class NaiwaGameplay {
     }
 
     /** 飞升阶段始终保护，正常结束后保留触发起三十秒的余量；退出、死亡和换维度主动清理。 */
-    static boolean protectedFromMobs(ServerPlayer p) {
+    public static boolean protectedFromMobs(ServerPlayer p) {
         return p.isAlive()&&!p.isSpectator()&&(FLIGHTS.containsKey(p.getUUID())||p.hasEffect(Naiwa.ASCENDING)
                 ||p.level().getGameTime()<MOB_PROTECTION.getOrDefault(p.getUUID(),Long.MIN_VALUE));
     }
@@ -217,11 +198,11 @@ public final class NaiwaGameplay {
         for (InteractionHand hand : InteractionHand.values()) {
             ItemStack stack=p.getItemInHand(hand);
             if (stack.is(Items.TOTEM_OF_UNDYING)) return false;
-            if (!stack.is(Naiwa.TOTEM.get()) || !CommonHooks.onLivingUseTotem(p,source,stack,hand)) continue;
+            if (!stack.is(Naiwa.TOTEM.get()) || !NaiwaPlatform.allowTotem(p,source,stack,hand)) continue;
             ItemStack used=stack.copy(); stack.shrink(1);
             p.awardStat(Stats.ITEM_USED.get(Naiwa.TOTEM.get())); CriteriaTriggers.USED_TOTEM.trigger(p,used);
             p.gameEvent(GameEvent.ITEM_INTERACT_FINISH);
-            p.setHealth(1); p.removeEffectsCuredBy(EffectCures.PROTECTED_BY_TOTEM);
+            p.setHealth(1); NaiwaPlatform.cureTotemEffects(p);
             // 生命恢复和防火各六十秒，伤害吸收三十秒，不再先于完整飞升演出结束。
             p.addEffect(new MobEffectInstance(MobEffects.REGENERATION,1200,1));
             p.addEffect(new MobEffectInstance(MobEffects.ABSORPTION,600,1));
@@ -238,11 +219,11 @@ public final class NaiwaGameplay {
         p.removeEffect(Naiwa.LAUGHING);
         Flight flight=new Flight(p); // 离座可能改变脚部高度，六格目标必须先按触发位置记录。
         p.stopRiding();
-        p.getPersistentData().putBoolean(SAFE_FALL,true);
+        NaiwaPlatform.playerData(p).putBoolean(SAFE_FALL,true);
         FLIGHTS.put(p.getUUID(),flight);
         MOB_PROTECTION.put(p.getUUID(),p.level().getGameTime()+TOTEM_PROTECTION_TICKS);
         LANDING_MOCKS.put(p.getUUID(),-1L);
-        p.getPersistentData().putBoolean(OLD_GRAVITY,flight.gravity);
+        NaiwaPlatform.playerData(p).putBoolean(OLD_GRAVITY,flight.gravity);
         p.setNoGravity(true); p.setDeltaMovement(Vec3.ZERO); p.fallDistance=0;
         phase(p,0,10);
         // 图腾只击退一次，不附加伤害；复用盾牌的同盟、宠物和 PvP 过滤。
@@ -258,9 +239,9 @@ public final class NaiwaGameplay {
     /** 飞升计时结束只恢复玩家，仍保留落地待办；半空结束不等于已经落地。 */
     private static void finish(ServerPlayer p,Flight flight) {
         FLIGHTS.remove(p.getUUID()); p.setNoGravity(flight.gravity); p.removeEffect(Naiwa.ASCENDING);
-        p.getPersistentData().remove(OLD_GRAVITY);
+        NaiwaPlatform.playerData(p).remove(OLD_GRAVITY);
         p.getAttribute(Attributes.MOVEMENT_SPEED).removeModifier(SLOW); p.fallDistance=0;
-        if (p.onGround() || p.isInWater()) p.getPersistentData().remove(SAFE_FALL);
+        if (p.onGround() || p.isInWater()) NaiwaPlatform.playerData(p).remove(SAFE_FALL);
     }
 
     /** 退出、换维度、死亡或主动中断取消落地演出；尚未落地的一次免摔资格仍按原规则保留。 */
@@ -271,12 +252,12 @@ public final class NaiwaGameplay {
         Flight old=FLIGHTS.get(p.getUUID());
         if (old!=null) finish(p,old);
         // 崩溃后 Map 已丢失，但原版会保存 NoGravity；用单独标记恢复进入效果之前的值。
-        if (p.getPersistentData().contains(OLD_GRAVITY)) {
-            p.setNoGravity(p.getPersistentData().getBoolean(OLD_GRAVITY)); p.getPersistentData().remove(OLD_GRAVITY);
+        if (NaiwaPlatform.playerData(p).contains(OLD_GRAVITY)) {
+            p.setNoGravity(NaiwaPlatform.playerData(p).getBoolean(OLD_GRAVITY)); NaiwaPlatform.playerData(p).remove(OLD_GRAVITY);
         }
         p.removeEffect(Naiwa.LAUGHING); p.removeEffect(Naiwa.ASCENDING);
         p.getAttribute(Attributes.MOVEMENT_SPEED).removeModifier(SLOW); LEAKS.remove(p.getUUID());
-        if (!p.isAlive()) p.getPersistentData().remove(SAFE_FALL);
+        if (!p.isAlive()) NaiwaPlatform.playerData(p).remove(SAFE_FALL);
     }
 
     /** 阶段单位为 tick；只移动碰撞允许的距离，不穿顶，不在障碍移除后补升。 */
@@ -301,7 +282,7 @@ public final class NaiwaGameplay {
             if (dy!=0) {
                 p.move(MoverType.SELF,new Vec3(0,dy,0));
                 // 仅发送裁定高度，不触发原版传送确认；水平位置仍由玩家正常移动包更新。
-                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p,new NaiwaFlightHeight(p.getY()));
+                NaiwaPlatform.syncFlightHeight(p);
             }
             p.setDeltaMovement(new Vec3(p.getDeltaMovement().x,0,p.getDeltaMovement().z));
             if (stage==1 && (p.getY()>=target-.001 || p.getY()-before<dy-.001 || ++ticks>=40)) {

@@ -1,16 +1,17 @@
 package com.naiwa;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 /** 模型验收入口只控制已有奶蛙的动作，不修改玩家、不生成物品或执行图腾保命。 */
 public final class NaiwaCommands {
-    public static void register(RegisterCommandsEvent event) {
-        event.getDispatcher().register(Commands.literal("naiwa").requires(source -> source.hasPermission(2))
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        dispatcher.register(Commands.literal("naiwa").requires(source -> source.hasPermission(2))
                 .then(Commands.literal("animation").then(Commands.argument("targets", EntityArgument.entities())
                         .then(Commands.argument("clip", StringArgumentType.word()).suggests((context, builder) -> {
                             var names = new java.util.ArrayList<>(NaiwaAnimations.NAMES); names.add("auto");

@@ -9,7 +9,6 @@ import org.joml.Vector3f;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.ShaderInstance;
-import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 
 /** 本体、箱中探头、盾牌头部及玩家变身共用源网格和蒙皮；实例工作数组仅在渲染线程内使用。 */
 final class NaiwaModel {
@@ -62,8 +61,8 @@ final class NaiwaModel {
         for(RenderType type:flightTypes)buffers.endBatch(type);
     }
 
-    static void shaders(RegisterShadersEvent event)throws java.io.IOException {
-        event.registerShader(new NaiwaWorldShader(event.getResourceProvider(),id("flight_body"),FLIGHT_FORMAT),loaded->flightShader=loaded);
+    static void shaders(NaiwaAscensionVisuals.ShaderRegistration registrar)throws java.io.IOException {
+        registrar.register(id("flight_body"),FLIGHT_FORMAT,loaded->flightShader=loaded);
     }
 
     /** 仅紧随本演员 holdingBook=true 的绘制调用；下一演员会覆盖缓存，不跨帧复用。 */

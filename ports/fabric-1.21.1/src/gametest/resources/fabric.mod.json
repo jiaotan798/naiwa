@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "naiwa-tests",
+  "version": "1",
+  "entrypoints": {
+    "fabric-gametest": ["com.naiwa.NaiwaFabricTests"],
+    "client": ["com.naiwa.client.FabricClientSmoke"]
+  },
+  "mixins": [{"config": "naiwa.fabric.qa.mixins.json", "environment": "client"}],
+  "depends": {"naiwa": "*", "fabric-gametest-api-v1": "*"}
+}

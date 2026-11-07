@@ -1,0 +1,138 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+/** 26.1.2 的单物品配方原料为 ID 字符串；只转换共享图腾配方的原料表示。 */
+class ModernRecipeReader extends FilterReader {
+    ModernRecipeReader(Reader reader) { super(new StringReader(convert(reader))) }
+
+    private static String convert(Reader reader) {
+        def recipe = new JsonSlurper().parse(reader)
+        recipe.key = recipe.key.collectEntries { symbol, ingredient -> [(symbol): ingredient.item] }
+        return JsonOutput.prettyPrint(JsonOutput.toJson(recipe))
+    }
+}
+
+def baseMod = file('../../mod')
+def baseProperties = new Properties()
+file("${baseMod}/gradle.properties").withInputStream { baseProperties.load(it) }
+version = baseProperties.getProperty('mod_version')
+group = 'com.naiwa'
+base.archivesName = 'naiwa'
+
+// 优先使用当前版本或加载器实现；未覆盖的文件直接编译 1.21.1 的玩法和模型源码。
+def sources = [:]
+def clientSmoke = providers.gradleProperty('clientSmoke').isPresent()
+def common = fileTree("${baseMod}/src/main/java") {
+    exclude 'com/naiwa/*Tests.java', 'com/naiwa/client/*Probe.java'
+}
+if (portLoader != 'NeoForge') {
+    common.exclude 'com/naiwa/NaiwaNeoForge*.java', 'com/naiwa/client/ClientBootstrap.java'
+    common.exclude 'com/naiwa/mixin/FishingHookMixin.java', 'com/naiwa/mixin/NeoForgeEntityLifecycleMixin.java'
+}
+if (portLoader == 'Fabric') common.exclude 'com/naiwa/client/NaiwaWorldShader.java'
+if (portGameVersion == '26.1.2') common.exclude 'com/naiwa/client/NaiwaWorldShader.java'
+if (portGameVersion == '26.1.2') common.exclude 'com/naiwa/mixin/PlayerModelMixin.java'
+def layers = [common]
+if (portLoader == 'Fabric') layers.add(fileTree('../fabric-1.21.1/src/main/java'))
+layers.add(fileTree("../shared-${portGameVersion}/src/main/java"))
+layers.add(fileTree('src/main/java'))
+if (clientSmoke) {
+    layers.add(fileTree("../shared-${portGameVersion}/src/clientSmoke/java"))
+    layers.add(fileTree('src/clientSmoke/java'))
+}
+layers.each { tree ->
+    tree.matching { include '**/*.java' }.visit { entry ->
+        if (!entry.directory) sources[entry.relativePath.pathString] = entry.file
+    }
+}
+if (portGameVersion == '26.1.2') {
+    // 旧版后处理、物品渲染和盾牌重定向由 26.1.2 的组件与渲染管线负责。
+    ['FabricShaderMixin','FabricBloomProgramMixin','FabricShieldItemMixin','FabricPlayerRendererMixin','FabricHandMixin','FabricFogMixin'].each { name ->
+        sources.remove("com/naiwa/mixin/${name}.java".toString())
+    }
+}
+sourceSets.main.java.setSrcDirs([])
+tasks.named('compileJava', JavaCompile) {
+    source sources.values()
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xmaxerrs', '350']
+}
+
+def sourceAssets = file("${baseMod}/src/main/resources")
+tasks.register('verifyModel', Exec) {
+    commandLine 'node', file('../../scripts/bake-model.mjs'), '--check'
+}
+processResources {
+    dependsOn verifyModel
+    inputs.property 'version', project.version.toString()
+    inputs.property 'clientSmoke', clientSmoke
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    includeEmptyDirs = false
+    from("../shared-${portGameVersion}/src/main/resources")
+    from(sourceAssets) {
+        exclude 'META-INF/**', '*.mixins.json', 'data/naiwa/structure/empty.nbt', 'data/naiwa/neoforge/**'
+        exclude 'pack.mcmeta'
+        if (portGameVersion == '26.1.2') {
+            exclude 'assets/naiwa/shaders/**', 'assets/naiwa/models/item/naiwa_spawn_egg.json'
+            exclude 'data/naiwa/recipe/**'
+        }
+        if (portGameVersion == '1.20.1') {
+            exclude 'data/naiwa/recipe/**'
+            exclude 'data/minecraft/tags/item/enchantable/durability.json'
+            eachFile { details ->
+                details.path = details.path.replace('data/naiwa/tags/entity_type/', 'data/naiwa/tags/entity_types/')
+            }
+        }
+    }
+    if (portGameVersion == '1.20.1') {
+        from("${sourceAssets}/data/naiwa/recipe") {
+            into 'data/naiwa/recipes'
+            // 旧版配方结果读取 item 字段。十四个原始布局仍从同一套配方资源生成。
+            filter { line -> line.replace('"id":', '"item":') }
+        }
+    }
+    if (portGameVersion == '26.1.2') {
+        from("${sourceAssets}/data/naiwa/recipe") {
+            into 'data/naiwa/recipe'
+            filter ModernRecipeReader
+        }
+    }
+    from('../../assets/runtime') {
+        exclude 'model-manifest.json', 'native-pose-checks.json'
+    }
+    if (portLoader == 'Forge' || portLoader == 'NeoForge') {
+        from(sourceAssets) {
+            include 'data/naiwa/neoforge/biome_modifier/naiwa_spawns.json'
+            if (portLoader == 'Forge') {
+                eachFile { details -> details.path = details.path.replace('/neoforge/', '/forge/') }
+                filter { line -> line.replace('neoforge:add_spawns', 'forge:add_spawns') }
+            }
+        }
+    }
+    filesMatching(['fabric.mod.json', 'META-INF/mods.toml', 'META-INF/neoforge.mods.toml']) {
+        expand(version: project.version)
+    }
+    if (clientSmoke) filesMatching('naiwa*.mixins.json') {
+        filter { line -> line.replace('"client": [', '"client": ["PortWindowMixin", "PortMouseMixin", "PortClientSmokeMixin",') }
+    }
+}
+
+if (clientSmoke) {
+    // 测试 Mixin 只进入运行目录；即使误带属性构建也不输出可分发 JAR。
+    tasks.withType(AbstractArchiveTask).configureEach {
+        doFirst { throw new GradleException('后台客户端验收请单独执行 runClientSmoke -PclientSmoke') }
+    }
+    def prepare = tasks.register('prepareClientSmoke') {
+        doLast {
+            def gameDir = file('run-client-smoke')
+            def config = new File(gameDir,'config')
+            config.mkdirs()
+            new File(config,'fml.toml').text = 'earlyWindowControl=false\n'
+            new File(gameDir,'options.txt').text = 'soundCategory_master:0.0\n'
+        }
+    }
+    tasks.matching { it.name == 'runClientSmoke' }.configureEach {
+        dependsOn prepare
+        timeout = java.time.Duration.ofMinutes(4)
+    }
+}

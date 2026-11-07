@@ -1,0 +1,81 @@
+plugins {
+    id 'java'
+    id 'net.minecraftforge.gradle' version '6.0.54'
+    id 'org.spongepowered.mixin' version '0.7.38'
+}
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+def runTests = providers.gradleProperty('gameTests').isPresent()
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    runs {
+        if (providers.gradleProperty('clientSmoke').isPresent()) client {
+            workingDirectory project.file('run-client-smoke')
+            args '--username','NaiwaPortQA'
+            mods { naiwa { source sourceSets.main } }
+        }
+        if (runTests) gameTestServer {
+            workingDirectory project.file('run-gametest')
+            property 'forge.enabledGameTestNamespaces','naiwa'
+            mods { naiwa { source sourceSets.main } }
+        }
+        server {
+            workingDirectory project.file('run-server')
+            args '--nogui'
+            mods { naiwa { source sourceSets.main } }
+        }
+    }
+}
+repositories {
+    maven {
+        url = layout.buildDirectory.dir('offline-maven')
+        content { includeGroup('io.github.llamalad7') }
+    }
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+    maven { url = 'https://maven.minecraftforge.net/' }
+    mavenCentral()
+}
+jarJar.enable()
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.23'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    compileOnly(annotationProcessor('io.github.llamalad7:mixinextras-common:0.4.1'))
+    implementation 'io.github.llamalad7:mixinextras-forge:0.4.1'
+    jarJar('io.github.llamalad7:mixinextras-forge:0.4.1') {
+        jarJar.ranged(it, '[0.4.1,)')
+        jarJar.pin(it, '0.4.1')
+    }
+}
+ext.portGameVersion = '1.20.1'
+ext.portLoader = 'Forge'
+apply from: '../port.gradle'
+if (providers.gradleProperty('clientSmoke').isPresent()) {
+    tasks.register('runClientSmoke') { dependsOn 'runClient' }
+    tasks.matching { it.name == 'runClient' }.configureEach {
+        dependsOn 'prepareClientSmoke'
+        timeout = java.time.Duration.ofMinutes(4)
+    }
+}
+if (runTests) {
+    tasks.named('compileJava') {
+        source fileTree('src/gametest/java'), fileTree('../shared-1.20.1/src/gametest/java')
+    }
+    tasks.named('processResources') {
+        from('../../mod/src/main/resources') {
+            include 'data/naiwa/structure/empty.nbt'
+            eachFile { details -> details.path = details.path.replace('/structure/', '/structures/') }
+        }
+    }
+}
+mixin { add sourceSets.main, 'naiwa.forge.refmap.json'; config 'naiwa.forge.mixins.json' }
+jar {
+    exclude 'com/naiwa/LegacyChecks*.class', 'com/naiwa/LegacyGameTests*.class', 'data/naiwa/structures/empty.nbt'
+    archiveClassifier = 'slim'
+    manifest { attributes(['MixinConfigs':'naiwa.forge.mixins.json']) }
+    finalizedBy 'reobfJar'
+}
+tasks.named('jarJar') {
+    exclude 'com/naiwa/LegacyChecks*.class', 'com/naiwa/LegacyGameTests*.class', 'data/naiwa/structures/empty.nbt'
+    archiveFileName = "naiwa-${project.version}-Forge-1.20.1.jar"
+    manifest { attributes(['MixinConfigs':'naiwa.forge.mixins.json']) }
+    finalizedBy 'reobfJarJar'
+}

@@ -1,0 +1,36 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.naiwa.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "LivingEntityMixin",
+    "MobMixin",
+    "BoatMixin",
+    "FlightNetworkMixin",
+    "LegacyShieldSaveMixin",
+    "FabricServerPlayerMixin",
+    "FabricLivingDamageMixin",
+    "FabricMobTargetMixin",
+    "FabricFishingMixin",
+    "LegacyBlockDropsMixin",
+    "FabricShieldItemMixin"
+  ],
+  "client": [
+    "HumanoidModelMixin",
+    "PlayerModelMixin",
+    "LivingRendererMixin",
+    "ItemInHandRendererMixin",
+    "ChestBlockEntityMixin",
+    "AscensionSkyMixin",
+    "IrisWorldTimeMixin",
+    "FabricPlayerRendererMixin",
+    "FabricHandMixin",
+    "FabricFogMixin",
+    "FabricShaderMixin",
+    "FabricBloomProgramMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

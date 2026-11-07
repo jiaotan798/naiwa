@@ -1,0 +1,39 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.147'
+}
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+ext.portGameVersion = '26.1.2'
+ext.portLoader = 'NeoForge'
+apply from: '../port.gradle'
+def runTests = providers.gradleProperty('gameTests').isPresent()
+if (runTests) {
+    tasks.named('compileJava') {
+        source fileTree('src/gametest/java'), fileTree('../shared-26.1.2/src/gametest/java')
+    }
+    tasks.named('processResources') {
+        from('../../mod/src/main/resources') { include 'data/naiwa/structure/empty.nbt' }
+    }
+}
+neoForge {
+    version = '26.1.2.94'
+    runs {
+        if (providers.gradleProperty('clientSmoke').isPresent()) clientSmoke {
+            client()
+            gameDirectory = file('run-client-smoke')
+            programArguments.addAll('--username','NaiwaPortQA')
+        }
+        if (runTests) gameTestServer {
+            type = 'gameTestServer'
+            gameDirectory = file('run-gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces','naiwa'
+        }
+        client { client() }
+        server { server(); programArgument '--nogui' }
+    }
+    mods { naiwa { sourceSet(sourceSets.main) } }
+}
+jar {
+    archiveFileName = "naiwa-${project.version}-NeoForge-26.1.2.jar"
+    exclude 'com/naiwa/ModernChecks*.class', 'com/naiwa/ModernGameTests*.class', 'data/naiwa/structure/empty.nbt'
+}

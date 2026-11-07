@@ -13,7 +13,7 @@ Minecraft Java 生存整蛊模组，模组 ID 为 `naiwa`，当前版本 **0.4.9
 | Java | 21 |
 | 动画前置 | 无需 YSM、GeckoLib 或其他动画模组 |
 
-当前只提供上述版本，不适用于 Forge、Fabric、基岩版或网易手机版。普通游玩只需正式 JAR，不要安装开发验收探针 `naiwa-qa.jar`。
+0.4.9 Release 的 JAR 对应上表的 1.21.1 NeoForge。仓库也提供 1.20.1 Forge／Fabric、1.21.1 Fabric、26.1.2 NeoForge／Fabric 的源码和[构建说明](ports/README.md)。普通游玩请安装对应游戏版本及加载器的成品 JAR，开发验收探针 `naiwa-qa.jar` 仅用于测试。
 
 ## 更新记录
 
@@ -165,7 +165,7 @@ node .\scripts\bake-model.mjs --check
 - 允许正常游玩视频与直播保留广告、平台激励和打赏收益。
 - 修改后分发、出售模组或素材，以及其他未明确允许的用途，需另行取得书面授权。
 
-源码仓库为私有开发与备份仓库；访问权限不等于取得源码或素材的对外分发授权。项目美术、音效及上游工具的来源和许可分别见[代码与素材来源说明](THIRD_PARTY_NOTICES.md)。
+源码公开可查阅，项目原创部分保留全部权利。项目美术、音效及上游工具的来源和许可分别见[代码与素材来源说明](THIRD_PARTY_NOTICES.md)。
 
 ## 维护与验证边界
 

@@ -22,6 +22,8 @@ public final class NaiwaConfig {
     }
     private NaiwaConfig() {}
 
+    static boolean allowConsecutive() {return ALLOW_CONSECUTIVE_SAME_PRANK.get();}
+
     /** 将秒换算成 20 Hz tick 后按闭区间抽签，保留原五至十分钟的分布；颠倒输入不会产生负随机范围。 */
     public static int nextIntervalTicks(RandomSource random) {
         int first = MIN_INTERVAL_SECONDS.get(), second = MAX_INTERVAL_SECONDS.get();

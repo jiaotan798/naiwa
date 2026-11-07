@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"naiwa-tests","version":"1","entrypoints":{"fabric-gametest":["com.naiwa.LegacyGameTests"]},"depends":{"naiwa":"*","fabric-gametest-api-v1":"*"}}
