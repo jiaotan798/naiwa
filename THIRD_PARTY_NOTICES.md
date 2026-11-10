@@ -14,7 +14,7 @@
 | 采样网格、动画和实体贴图 | `assets/runtime/`，包含高模、低模和实体贴图 | 两个 `.nwm` 和一张实体贴图进入成品，校验 JSON 随源码 |
 | 当前盾牌源贴图 | `assets/shield/naiwa-shield-v1.png`；SHA256 `d7eef39dab1048d7c1891ea34f6f2d7ac891cbd44179e80155754d91571dacb3` | 源图供修改及模型检查使用；相同正式贴图进入成品 |
 | 物品与状态图标 | `scripts/make-icons.mjs` 中固定像素稿生成 | 运行图像随源码及成品 |
-| 本体与盾牌笑声音效 | 由作者提供的音轨剪辑 | `laugh_full.ogg` 和 `laugh_short.ogg` 随成品分发。 [音效说明](docs/音效说明.md) |
+| 本体与盾牌笑声音效 | 由作者提供的音轨剪辑 | `laugh_full.ogg` 和 `laugh_short.ogg` 随成品分发。 [音效维护](docs/模型接入说明.md#音效) |
 
 保留素材的路径、大小和 SHA256 见[当前素材指纹](third-party/asset-sha256.json)。指纹用于识别文件，不替代许可文字。
 

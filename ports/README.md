@@ -28,4 +28,4 @@ Fabric 的三项整蛊设置保存在世界的 `serverconfig/naiwa-server.json`�
 
 ## 源码验证
 
-按版本查看 [0.5.0 验证记录](../validation/0.5.0.md)及[历史验证](../validation/0.4.9.md)。
+按版本查看 [0.5.0 验证记录](../validation/0.5.0.md)和 [0.4.9 历史验证](https://github.com/jiaotan798/naiwa/blob/v0.4.9/validation/0.4.9.md)。
