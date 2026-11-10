@@ -1,6 +1,6 @@
 # 《奶蛙》
 
-> 奶蛙爱在你挖矿、钓鱼或开门时捣乱，被发现了还会捧腹大笑。**v0.5.0** 我给它换了带面部骨骼的新模型，补全了游戏内简介，也关掉了群系自然生成。你仍会在整蛊时遇见它。
+> 奶蛙爱在你挖矿、钓鱼或开门时捣乱，被发现了还会捧腹大笑。**v0.5.0** 换用带面部骨骼的新模型，补全游戏内简介，并关闭群系自然生成。你仍会在整蛊时遇见它。
 
 ## 下载与安装
 
@@ -44,6 +44,6 @@
 
 ## 作者、许可与素材
 
-我是 jiaotan_，奶蛙的作者。 [bilibili](https://space.bilibili.com/409729840?) · [抖音](https://v.douyin.com/KDs5ZxJh5V8/)
+作者 **jiaotan_**。 [bilibili](https://space.bilibili.com/409729840?) · [抖音](https://v.douyin.com/KDs5ZxJh5V8/)
 
 奶蛙的原创内容保留全部权利（**All Rights Reserved**）。个人游玩、整合包、服务器和视频直播的使用范围见许可文件。 [LICENSE](LICENSE) · [玩家使用授权](PLAYER_USAGE.md) · [代码与素材来源](THIRD_PARTY_NOTICES.md)
