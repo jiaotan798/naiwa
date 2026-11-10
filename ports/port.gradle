@@ -64,6 +64,7 @@ tasks.register('verifyModel', Exec) {
 }
 processResources {
     dependsOn verifyModel
+    filteringCharset = 'UTF-8'
     inputs.property 'version', project.version.toString()
     inputs.property 'clientSmoke', clientSmoke
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -100,17 +101,9 @@ processResources {
     from('../../assets/runtime') {
         exclude 'model-manifest.json', 'native-pose-checks.json'
     }
-    if (portLoader == 'Forge' || portLoader == 'NeoForge') {
-        from(sourceAssets) {
-            include 'data/naiwa/neoforge/biome_modifier/naiwa_spawns.json'
-            if (portLoader == 'Forge') {
-                eachFile { details -> details.path = details.path.replace('/neoforge/', '/forge/') }
-                filter { line -> line.replace('neoforge:add_spawns', 'forge:add_spawns') }
-            }
-        }
-    }
     filesMatching(['fabric.mod.json', 'META-INF/mods.toml', 'META-INF/neoforge.mods.toml']) {
-        expand(version: project.version)
+        // 展开版本占位符时保留 JSON 简介的换行转义。
+        expand([version: project.version]) { escapeBackslash = true }
     }
     if (clientSmoke) filesMatching('naiwa*.mixins.json') {
         filter { line -> line.replace('"client": [', '"client": ["PortWindowMixin", "PortMouseMixin", "PortClientSmokeMixin",') }

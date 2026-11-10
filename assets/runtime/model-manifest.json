@@ -1,9 +1,10 @@
 {
-  "sourceSha256": "530ab823e6f66065e52b68d9d5a24b765640945cac8e6fca12a590098c7291b9",
+  "sourceSha256": "b79d10ce2a50decaccb094c4a313cf8214757874a9edaa92a76db53c019fdfa0",
+  "normalSha256": "26ffe6b54b1e907cb3e44db7982f385652329ca866f266a196897c32bd778071",
   "fps": 50,
-  "bones": 38,
-  "vertices": 3580,
-  "triangles": 6997,
+  "bones": 52,
+  "vertices": 18078,
+  "triangles": 36001,
   "clips": [
     {
       "name": "idle",
@@ -74,12 +75,14 @@
   ],
   "files": {
     "assets/naiwa/textures/entity/naiwa_0.png": "42df551d598c2ad9211e8aef5258c49bc97aa4295614d4f8d4701ade64c57493",
-    "assets/naiwa/textures/entity/naiwa_1.png": "2ab58b933d2fe40d3267144bfd258c03f8704fde7745259d9fb6ae42b09ef6d1",
-    "assets/naiwa/textures/entity/naiwa_2.png": "862ca68d2048daf2e9416f31503fa00ed72f2214a62d89d1cf4f28705d200756",
-    "assets/naiwa/textures/entity/naiwa_3.png": "0aaa3d575e498575d58e9e6bec5385441c289b5f7e3b7868cc3da1e494a71dc3",
-    "assets/naiwa/textures/entity/naiwa_4.png": "da0c3265f48b7dac28f7c6904f20821afba2b20bceaeac68d9784846cbaf1276",
-    "assets/naiwa/textures/entity/naiwa_5.png": "f4e3cc68d8d9652c1561c0327e2735d1dc07b58a9f05a1927298fb9f6a2ab042",
-    "native-pose-checks.json": "ecd6ce6ba8b501ddfa64b766b8363dd22d4b35b18ee0807d9199c74c7b988e0b",
-    "assets/naiwa/models/entity/naiwa.nwm": "f54fb82a8a2467e634b9bba69a7eac4781fbd38bc55473ebd41e2d54205b4f1a"
+    "native-pose-checks.json": "f1f16793a541a5c5ee342a0f622682ea881cc955c27e4124956db5a3abb00434",
+    "assets/naiwa/models/entity/naiwa.nwm": "2875d9b024efa6adf928df3805ac402058a14304b98bbe216be55b426e32831e",
+    "assets/naiwa/models/entity/naiwa_lod.nwm": "94a30b9002612f8428a6a52e882bbd5da246e431a9b1acf3f7172b8875e99cbd"
+  },
+  "lod": {
+    "vertices": 5077,
+    "triangles": 9999,
+    "protectedFaces": 4295,
+    "error": 0.0017591690411791205
   }
 }

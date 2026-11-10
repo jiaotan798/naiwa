@@ -1,10 +1,10 @@
 # 《奶蛙》
 
-> 奶蛙会在你挖矿、钓鱼或开门时突然现身，整蛊得逞后捧腹大笑，带着空玻璃瓶还能收集它笑出来的笑气。**v0.4.9** 加入笑气瓶破碎特效，瓶子碎开时会冒出淡黄色烟雾，还会飞出四枚奶蛙表情。
+> 奶蛙会在你挖矿、钓鱼或开门时突然现身，整蛊得逞后捧腹大笑。**v0.5.0** 更新奶蛙的面部表情和游戏内简介，奶蛙会通过整蛊等玩法事件出现。
 
 ## 下载与安装
 
-从 [v0.4.9 Release](https://github.com/jiaotan798/naiwa/releases/tag/v0.4.9) 下载与下表匹配的 `.jar`。
+从 [v0.5.0 Release](https://github.com/jiaotan798/naiwa/releases/tag/v0.5.0) 下载与下表匹配的 `.jar`。
 
 | Minecraft | 加载器 | 安装位置 | 前置模组 |
 | --- | --- | --- | --- |
@@ -15,7 +15,7 @@
 | 26.1.2 | NeoForge 26.1.2.94 | 客户端及服务端 | 无 |
 | 26.1.2 | Fabric Loader 0.19.4 | 客户端及服务端 | Fabric API 0.149.0+26.1.2 |
 
-把匹配的 JAR 和所需前置模组放进对应实例的 `mods` 目录。Java 版本、详细安装步骤及联机和升级要求见[安装指南](https://github.com/jiaotan798/naiwa/releases/download/v0.4.9/INSTALL.md)。
+把匹配的 JAR 和所需前置模组放进对应实例的 `mods` 目录。Java 版本、详细安装步骤及联机和升级要求见[安装指南](https://github.com/jiaotan798/naiwa/releases/download/v0.5.0/INSTALL.md)。
 
 ## 玩法
 

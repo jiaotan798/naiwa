@@ -5,7 +5,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.resources.Identifier;
 import org.joml.Vector3f;
 
@@ -18,21 +17,33 @@ final class NaiwaModel {
     private final double[] rightHand = new double[3];
 
     NaiwaModel() {
-        try (var source = Minecraft.getInstance().getResourceManager().open(id("models/entity/naiwa.nwm"))) {
+        this(null);
+    }
+
+    /** 两档沿用同一批材质缓冲，避免延迟队列按网格精度拆分实体批次。 */
+    NaiwaModel(NaiwaModel fullDetail) {
+        String name = fullDetail == null ? "naiwa" : "naiwa_lod";
+        try (var source = Minecraft.getInstance().getResourceManager().open(id("models/entity/" + name + ".nwm"))) {
             mesh = new NaiwaMesh(source);
         } catch (java.io.IOException error) {
-            throw new IllegalStateException("奶蛙模型加载失败",error);
+            throw new IllegalStateException("奶蛙模型加载失败：" + name,error);
         }
         materialFaces = mesh.facesByMaterial(false);
         headFaces = mesh.facesByMaterial(true);
         positions = new float[mesh.vertexCount*3];
         normals = positions.clone();
-        types = new RenderType[mesh.materialCount];
-        flightTypes = new RenderType[types.length];
-        for (int i=0;i<types.length;i++) {
-            var texture = id("textures/entity/naiwa_"+i+".png");
-            types[i] = RenderTypes.entityCutout(texture);
-            flightTypes[i] = NaiwaRenderLayers.flight(texture);
+        if (fullDetail == null) {
+            types = new RenderType[mesh.materialCount];
+            flightTypes = new RenderType[types.length];
+            for (int i=0;i<types.length;i++) {
+                var texture = id("textures/entity/naiwa_"+i+".png");
+                types[i] = NaiwaRenderLayers.body(texture);
+                flightTypes[i] = NaiwaRenderLayers.flight(texture);
+            }
+        } else {
+            if (mesh.materialCount != fullDetail.mesh.materialCount) throw new IllegalStateException("奶蛙两档模型材质数不一致");
+            types = fullDetail.types;
+            flightTypes = fullDetail.flightTypes;
         }
     }
 
@@ -70,9 +81,10 @@ final class NaiwaModel {
         var normal = new Vector3f();
         float[] color = reveal>=0 ? new float[3] : null;
         var view = com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix();
+        // 队列的普通实体管线按三角形取顶点；飞升材质继续使用四边形。
+        int corners = color==null ? 3 : 4;
         for (int face : faces) {
-            for (int corner=0;corner<4;corner++) {
-                // 退化四边形保留源三角形的 UV 与绕序。
+            for (int corner=0;corner<corners;corner++) {
                 int local = Math.min(corner,2), p = mesh.corners[face*3+local]*3, u = face*6+local*2;
                 float x = positions[p]/16, y = (positions[p+1]+offset)/16, z = positions[p+2]/16;
                 var vertex = out.addVertex(transform,x,y,z).setUv(mesh.uv[u],mesh.uv[u+1]);

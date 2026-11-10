@@ -71,7 +71,8 @@ public final class NaiwaMesh {
             if(bone>=21&&bone<=22||handBone(bone,true)) actionRight[v]+=weight;
             // 36/37 是追加手指骨，不能归入腿部；换模型时需重新核对这些分区。
             if(bone>=26&&bone<=35) actionLegs[v]+=weight;
-            if(bone>=4&&bone<=15) actionHead[v]+=weight;
+            // 高模在原骨号后追加 38～51 号脸骨；程序俯仰需带动完全绑定到这些骨的眼睑、虹膜、牙齿和下颌。
+            if((bone>=4&&bone<=15)||(bone>=38&&bone<=51)) actionHead[v]+=weight;
         }
     }
 

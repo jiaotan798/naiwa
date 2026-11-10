@@ -12,6 +12,7 @@
 *.jar binary
 # 源模型及校验产物按原字节保存，避免克隆后的换行转换破坏来源摘要。
 *.bbmodel -text
+assets/source/nailong_face_normals.json -text
 assets/runtime/** -text
 # 生产资源按原字节进入 JAR，避免配方或材质换行转换使独立构建摘要偏离正式包。
 mod/src/main/resources/** -text whitespace=cr-at-eol

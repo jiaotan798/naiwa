@@ -3,6 +3,7 @@ package com.naiwa.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.OutlineBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Vector3f;
@@ -22,23 +23,43 @@ final class NaiwaModel {
     private final Vector3f vector = new Vector3f();
     private final float[] flightLight;
     private final Vector3f viewPoint=new Vector3f(),viewNormal=new Vector3f();
-    private final RenderType[] flightTypes;
+    private final RenderType[] bodyTypes, flightTypes;
     private static ShaderInstance flightShader;
 
     NaiwaModel() {
-        try (var source = Minecraft.getInstance().getResourceManager().open(id("models/entity/naiwa.nwm"))) {
+        this(null);
+    }
+
+    /** 两档沿用同一批材质缓冲，避免同屏混合精度时切换实体渲染层。 */
+    NaiwaModel(NaiwaModel fullDetail) {
+        String name = fullDetail == null ? "naiwa" : "naiwa_lod";
+        try (var source = Minecraft.getInstance().getResourceManager().open(id("models/entity/" + name + ".nwm"))) {
             mesh = new NaiwaMesh(source);
-        } catch (java.io.IOException error) {throw new IllegalStateException("奶蛙模型加载失败", error);}
+        } catch (java.io.IOException error) {throw new IllegalStateException("奶蛙模型加载失败：" + name, error);}
         positions = new float[mesh.vertexCount * 3]; normals = positions.clone();
-        flightLight=new float[mesh.vertexCount*3];flightTypes=new RenderType[mesh.materialCount];
-        textures = new ResourceLocation[mesh.materialCount];
-        for (int i=0;i<textures.length;i++) {textures[i]=id("textures/entity/naiwa_"+i+".png");flightTypes[i]=new FlightLayer(textures[i]);}
+        flightLight = new float[mesh.vertexCount * 3];
+        if (fullDetail == null) {
+            flightTypes = new RenderType[mesh.materialCount];
+            bodyTypes = new RenderType[mesh.materialCount];
+            textures = new ResourceLocation[mesh.materialCount];
+            for (int i=0;i<textures.length;i++) {
+                textures[i]=id("textures/entity/naiwa_"+i+".png");
+                bodyTypes[i]=ModelLayer.body(textures[i]);
+                flightTypes[i]=new ModelLayer(textures[i]);
+            }
+        } else {
+            if (mesh.materialCount != fullDetail.mesh.materialCount) throw new IllegalStateException("奶蛙两档模型材质数不一致");
+            textures = fullDetail.textures;
+            bodyTypes = fullDetail.bodyTypes;
+            flightTypes = fullDetail.flightTypes;
+        }
         materialFaces = mesh.facesByMaterial(false);
         headMaterialFaces = mesh.facesByMaterial(true);
     }
 
     private static ResourceLocation id(String path) {return new ResourceLocation("naiwa", path);}
     ResourceLocation texture() {return textures[0];}
+    int faceCount() {return mesh.faceCount;}
 
     /** 本体以脚底为原点，盾牌头部以头顶定位；16 编辑单位为 1 格，静态切面不会随动作跳变。 */
     void draw(String clip, double seconds, PoseStack pose, MultiBufferSource buffers, int light, int overlay, boolean headOnly) {
@@ -102,11 +123,15 @@ final class NaiwaModel {
                 NaiwaAscensionShapes.light(incidence,facing,flightReveal,flightLight,i);
             }
         }
+        boolean flight=flightReveal>=0;
+        // 原版轮廓缓冲按四边形同时读取实体顶点，发光时整批沿用原版配对的实体与轮廓类型。
+        boolean outline=!flight&&buffers instanceof OutlineBufferSource;
+        int corners=flight||outline?4:3;
         for (int material=0;material<textures.length;material++) {
-            var consumer=buffers.getBuffer(flightReveal>=0?flightTypes[material]:RenderType.entityCutoutNoCull(textures[material]));
+            var type=flight?flightTypes[material]:outline?RenderType.entityCutoutNoCull(textures[material]):bodyTypes[material];
+            var consumer=buffers.getBuffer(type);
             for (int face : (headOnly ? headMaterialFaces : materialFaces)[material]) {
-                // 原版实体缓冲按四边形提交，重复第三点形成退化三角形，保留原 UV 与绕序。
-                for(int corner=0;corner<4;corner++) {
+                for(int corner=0;corner<corners;corner++) {
                     int local=Math.min(corner,2),p=mesh.corners[face*3+local]*3,u=face*6+local*2;
                     consumer.vertex(positions[p],positions[p+1],positions[p+2]);
                     if(flightReveal>=0)consumer.color(flightLight[p]/3,flightLight[p+1]/3,flightLight[p+2]/3,1);
@@ -121,12 +146,20 @@ final class NaiwaModel {
     }
 
     /** 独立阶段直接使用自有着色器并写入角色深度，后续雨丝和光尘仍能正确被身体遮挡。 */
-    private static final class FlightLayer extends RenderType {
+    static final class ModelLayer extends RenderType {
+        /** 复用标准实体着色器和缓冲状态，让光影按自己的实体管线处理逐顶点法线。 */
+        static RenderType body(ResourceLocation texture) {
+            return create("naiwa_body_triangles",DefaultVertexFormat.NEW_ENTITY,VertexFormat.Mode.TRIANGLES,1536,true,false,
+                    CompositeState.builder().setShaderState(RENDERTYPE_ENTITY_CUTOUT_NO_CULL_SHADER)
+                            .setTextureState(new TextureStateShard(texture,false,false)).setCullState(NO_CULL)
+                            .setLightmapState(LIGHTMAP).setOverlayState(OVERLAY).createCompositeState(false));
+        }
+
         private static final ShaderStateShard PROGRAM=new ShaderStateShard(()->flightShader);
-        private FlightLayer(ResourceLocation texture) {
+        private ModelLayer(ResourceLocation texture) {
             this(new TextureStateShard(texture,false,false));
         }
-        private FlightLayer(TextureStateShard texture) {
+        private ModelLayer(TextureStateShard texture) {
             super("naiwa_flight_body",FLIGHT_FORMAT,VertexFormat.Mode.QUADS,1536,false,false,
                     ()->{PROGRAM.setupRenderState();texture.setupRenderState();LEQUAL_DEPTH_TEST.setupRenderState();NO_CULL.setupRenderState();NO_TRANSPARENCY.setupRenderState();COLOR_DEPTH_WRITE.setupRenderState();},
                     ()->{COLOR_DEPTH_WRITE.clearRenderState();NO_TRANSPARENCY.clearRenderState();NO_CULL.clearRenderState();LEQUAL_DEPTH_TEST.clearRenderState();texture.clearRenderState();PROGRAM.clearRenderState();});

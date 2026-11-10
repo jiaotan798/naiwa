@@ -185,6 +185,9 @@ final class NaturalCheck {
                     for(var shore:shores) {cases.add(shore);var boatSite=new Gson().fromJson(new Gson().toJson(shore),NaturalSite.class);boatSite.kind="boat";cases.add(boatSite);}
                 }
                 if(System.getProperty("naiwa.qa.focus")!=null)cases.removeIf(s->!s.kind.equals(System.getProperty("naiwa.qa.focus")));
+                String label=System.getProperty("naiwa.qa.focusSite");
+                if(label!=null)cases.removeIf(site->!site.label.equals(label));
+                require(!cases.isEmpty(),"自然场景过滤后没有可测试的场地");
                 MultiplayerCheck.write("natural-sites.json",new Gson().toJson(Map.of("seed",8675309,"scannedChunks",scan,"cases",cases)));fixture(a,v);return;
             }
             require(a!=null&&v!=null,"测试中双方保持连接");require(ticks-started<2500,"阶段超时");

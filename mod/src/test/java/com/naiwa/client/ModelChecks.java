@@ -17,17 +17,11 @@ public final class ModelChecks {
         GasParticleChecks.check();
         byte[] bytes = Files.readAllBytes(Path.of("../assets/runtime/assets/naiwa/models/entity/naiwa.nwm"));
         var model = new NaiwaMesh(new ByteArrayInputStream(bytes));
-        assert model.vertexCount == 3580 && model.boneCount == 38 && model.faceCount == 6997 && model.materialCount == 6;
+        assert model.vertexCount == 18078 && model.boneCount == 52 && model.faceCount == 36001 && model.materialCount == 1;
         var referenced=new boolean[model.vertexCount];for(int vertex:model.corners)referenced[vertex]=true;
-        int unused=0;for(boolean used:referenced)if(!used)unused++;
-        assert unused==31 : "精修模型的无面顶点须保留，不能重排原生姿态对照的顶点索引";
-        // 精修脸部使用六种材质，包含透明的旧眨眼遮片；不能只打包原来的两张贴图。
-        int[][] sizes={{2048,2048},{512,256},{512,512},{1024,512},{2048,2048},{8,8}};
-        for(int material=0;material<sizes.length;material++) {
-            var image=ImageIO.read(Path.of("../assets/runtime/assets/naiwa/textures/entity/naiwa_"+material+".png").toFile());
-            assert image.getWidth()==sizes[material][0]&&image.getHeight()==sizes[material][1] : "精修脸部贴图尺寸不符："+material;
-            if(material==5)for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++)assert(image.getRGB(x,y)>>>24)==0 : "旧眨眼遮片必须透明，不能露出黑片";
-        }
+        for(boolean used:referenced)assert used : "高模源网格的每个顶点均参与三角面";
+        var image=ImageIO.read(Path.of("../assets/runtime/assets/naiwa/textures/entity/naiwa_0.png").toFile());
+        assert image.getWidth()==2048&&image.getHeight()==2048 : "高模基础贴图尺寸不符";
         assert model.clips.keySet().equals(new java.util.LinkedHashSet<>(NaiwaAnimations.NAMES));
         renderPreparationChecks(model);
         actionPrecomputationChecks(model);
@@ -41,8 +35,8 @@ public final class ModelChecks {
                 rear=Math.min(rear,z); front=Math.max(front,z);
             }
         }
-        // 圆脸源文件的嘴部前界约 4.261；连同颈部切面及后脑核对，防止误打包上一版面部。
-        assert headCount==1654 && rear < -4 && front > 4.25 && front < 4.28 : "盾牌头部缺少后脑或圆脸面部";
+        // 高模的嘴部前界约 4.519；固定颈部切面须保留眼睑、嘴部和后脑。
+        assert headCount==4295 && rear < -4 && front > 4.51 && front < 4.53 : "盾牌或箱中探头裁切缺面";
         float[] positions = model.positions.clone(), normals = model.normals.clone();
         float[] other = positions.clone(), otherNormals = normals.clone();
         for (var clip : model.clips.values()) {
@@ -69,6 +63,7 @@ public final class ModelChecks {
         }
         model.poseAction("idle",.5,positions,normals,"mine",0);model.poseAction("idle",.5,other,otherNormals,"mine",60);
         assert distance(positions,other)>0 : "装挖时头部须按最近方块的俯仰变化，不能只在服务器记录转头";
+        faceActionChecks(model,positions,normals,other,otherNormals);
         var indices = checks.getAsJsonArray("indices");
         model.pose("idle",.5,positions,normals);model.poseAction("idle",.5,other,otherNormals,"chest_peek",0);
         assert distance(positions,other)==0 : "箱内探头只复用待机采样，不得新增扶箱或翻倒姿势";
@@ -94,6 +89,27 @@ public final class ModelChecks {
         rejects(corrupt); rejects(Arrays.copyOf(bytes, 40));
         shieldSkin();
         System.out.println("11 段动画、33 组原生姿态对照、播放边界和损坏资源检查通过；最大蒙皮误差 BB 单位：" + largest);
+    }
+
+    /** 只看没有旧头骨权重的脸部顶点，避免旧骨带动的顶点掩盖新脸骨遗漏。 */
+    private static void faceActionChecks(NaiwaMesh model,float[] flat,float[] flatNormals,float[] tilted,float[] tiltedNormals) {
+        for(String action:new String[]{"mine","scope_close"}) {
+            model.poseAction("idle",.5,flat,flatNormals,action,0);
+            model.poseAction("idle",.5,tilted,tiltedNormals,action,45);
+            int checked=0;
+            for(int vertex:model.headVertices) {
+                boolean oldHead=false,face=false;
+                for(int bone:model.joints[vertex]) {
+                    oldHead|=bone>=4&&bone<=15;
+                    face|=bone>=38&&bone<=51;
+                }
+                if(oldHead||!face)continue;
+                int y=vertex*3+1;
+                assert Math.abs(flat[y]-tilted[y])+Math.abs(flat[y+1]-tilted[y+1])>1e-6 : "新增脸骨顶点未随俯仰："+action+"/"+vertex;
+                checked++;
+            }
+            assert checked==233 : "高模俯仰回归未覆盖全部只受新增脸骨影响的头部顶点";
+        }
     }
 
     /** 用优化前的逐顶点算法作独立基准，逐元素检查位置与法线，不只检查有限数或少量特征点。 */
@@ -135,7 +151,7 @@ public final class ModelChecks {
                 if(bone>=17&&bone<=18||bone==19||bone==36)left+=weight;
                 if(bone>=21&&bone<=22||bone==23||bone==37)right+=weight;
                 if(bone>=26&&bone<=35)legs+=weight;
-                if(bone>=4&&bone<=15)head+=weight;
+                if((bone>=4&&bone<=15)||(bone>=38&&bone<=51))head+=weight;
             }
             float arms=switch(action) {
                 case "tree","tree_exposed","fish" -> -1.2F;
@@ -174,7 +190,7 @@ public final class ModelChecks {
                 assert index==groups[m].length : "分组不能多出面片";
                 total+=index;
             }
-            assert total==(headOnly?1654:model.faceCount) : "全身及头部面片不能遗漏";
+            assert total==(headOnly?4295:model.faceCount) : "全身及头部面片不能遗漏";
         }
         float[] posed=new float[model.vertexCount*3],normals=posed.clone();
         double[] hand=new double[3];

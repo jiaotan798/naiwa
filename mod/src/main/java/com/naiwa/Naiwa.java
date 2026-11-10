@@ -91,6 +91,7 @@ public final class Naiwa {
         container.registerConfig(ModConfig.Type.SERVER, NaiwaConfig.SPEC);
         ENTITIES.register(bus); ITEMS.register(bus); COMPONENTS.register(bus); SOUNDS.register(bus); TABS.register(bus); EFFECTS.register(bus);PARTICLES.register(bus);
         bus.addListener((EntityAttributeCreationEvent event) -> event.put(ENTITY.get(), NaiwaEntity.attributes().build()));
+        // 只登记放置校验。群系生成池不加入奶蛙，整蛊独立创建临时演员。
         bus.addListener((RegisterSpawnPlacementsEvent event) -> event.register(ENTITY.get(), SpawnPlacementTypes.ON_GROUND,
                 Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 (type, level, reason, pos, random) -> level.getBlockState(pos.below()).is(Blocks.GRASS_BLOCK)

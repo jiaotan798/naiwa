@@ -30,6 +30,13 @@ public final class MultiplayerCheck {
     private double viewerZ;
     private boolean quitting;
     public MultiplayerCheck() {
+        if(Boolean.getBoolean("naiwa.qa.frameBenchmark")) {
+            // 关闭测量玩家的整蛊调度：固定镜头会触发苦力怕代班，额外奶蛙会污染帧率样本。
+            NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event)->
+                    event.getEntity().getPersistentData().putLong("naiwa.prank_next",Long.MAX_VALUE));
+            if(net.neoforged.fml.loading.FMLEnvironment.dist==net.neoforged.api.distmarker.Dist.CLIENT)new FrameBenchmarkClient();
+            return;
+        }
         if(Boolean.getBoolean("naiwa.qa.gasEffects")) {
             new GasEffectsCheck();
             if(net.neoforged.fml.loading.FMLEnvironment.dist==net.neoforged.api.distmarker.Dist.CLIENT)new GasEffectsClient();
@@ -140,7 +147,11 @@ public final class MultiplayerCheck {
                 }
                 case 2 -> {if (!a.isBlocking()) return;damage(a);require(NaiwaShield.charge(a.getMainHandItem())==1,"第一次真实格挡");stage(3);}
                 case 3 -> {damage(a);require(NaiwaShield.charge(a.getMainHandItem())==2,"第二次真实格挡");stage(4);}
-                case 4 -> {v.connection.teleport(.5,81,0,0,0);viewerZ=v.getZ();damage(a);stage(5);}
+                case 4 -> {
+                    v.connection.teleport(.5,81,0,0,0);viewerZ=v.getZ();damage(a);
+                    // 真实格挡完成后移开伤害源，给旁观客户端留出拍摄盾面与探头的视线。
+                    target.setPos(3.5,81,1.5);stage(5);
+                }
                 case 5 -> {
                     require(NaiwaShield.charge(a.getMainHandItem())==0 && v.getZ()<viewerZ-.1,"第三次格挡清零且真正击退另一个客户端");
                     target.discard();reset(a,.5,3,180);reset(v,2,2,145);frog.setPos(.5,81,.5);frog.play("laugh_sequence");
@@ -205,7 +216,12 @@ public final class MultiplayerCheck {
                 }
                 case 20 -> {
                     require(a.isAlive() && !a.hasEffect(Naiwa.ASCENDING) && !a.isNoGravity(),"死亡重生没有飞升残留");
-                    write("server-result.txt","PASS: production JAR, two real players; conversion, three blocked hits and remote knockback, atomic competing collection, actual gas projectile and damage release, player attack denial, six-block flight, logout/reconnect, dimension change, real death/respawn.\n");
+                    reset(a,.5,3,180);reset(v,2,2,135);
+                    frog.setPos(.5,81,.5);frog.setGlowingTag(true);stage(21);
+                }
+                case 21 -> {
+                    require(frog.isCurrentlyGlowing(),"轮廓场景收到真实服务端发光标记");
+                    write("server-result.txt","PASS: production JAR, two real players; glowing entity, conversion, three blocked hits and remote knockback, atomic competing collection, actual gas projectile and damage release, player attack denial, six-block flight, logout/reconnect, dimension change, real death/respawn.\n");
                     stage(99);quitting=true;
                 }
             }

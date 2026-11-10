@@ -2,8 +2,6 @@ package com.naiwa;
 
 import java.util.function.Supplier;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.biome.v1.BiomeModifications;
-import net.fabricmc.fabric.api.biome.v1.BiomeSelectors;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.fabricmc.fabric.api.particle.v1.FabricParticleTypes;
@@ -22,7 +20,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.SpawnEggItem;
-import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.Heightmap;
 
@@ -67,10 +64,9 @@ public final class Naiwa implements ModInitializer {
                 FabricItemGroup.builder().title(Component.translatable("itemGroup.naiwa")).icon(() -> new ItemStack(EGG.get()))
                         .displayItems((params,output) -> {output.accept(EGG.get()); output.accept(SHIELD.get()); output.accept(GAS.get()); output.accept(TOTEM.get());}).build());
         FabricDefaultAttributeRegistry.register(ENTITY.get(),NaiwaEntity.attributes());
+        // 仅登记放置校验。群系生成池不加入奶蛙，整蛊独立创建临时演员。
         SpawnPlacements.register(ENTITY.get(),SpawnPlacements.Type.ON_GROUND,Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 (type,level,reason,pos,random) -> level.getBlockState(pos.below()).is(Blocks.GRASS_BLOCK) && level.getRawBrightness(pos,0)>8);
-        BiomeModifications.addSpawn(BiomeSelectors.includeByKey(Biomes.PLAINS,Biomes.SUNFLOWER_PLAINS,Biomes.FOREST,Biomes.BIRCH_FOREST,Biomes.SWAMP),
-                MobCategory.CREATURE,ENTITY.get(),2,1,1);
         NaiwaFabricEvents.register();
     }
 }

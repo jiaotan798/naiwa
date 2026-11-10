@@ -6,25 +6,43 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {lodPath, simplifyModel} from './simplify-model.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.join(project, 'assets/source/nailong_origin_zero.bbmodel');
 const output = path.join(project, 'assets/runtime');
 const sourceBytes = await fs.readFile(source);
 const sha256 = createHash('sha256').update(sourceBytes).digest('hex');
+// 局部修形的法线源绑定 BBModel 摘要，避免编辑网格后静默套用旧法线。
+const normalSource = await fs.readFile(path.join(project, 'assets/source/nailong_face_normals.json')).catch(error => {
+  if (error.code === 'ENOENT') return null;
+  throw error;
+});
+const normalSha256 = normalSource && createHash('sha256').update(normalSource).digest('hex');
 const manifestPath = path.join(output, 'model-manifest.json');
-if (process.argv.includes('--check')) {
+const modelPath = 'assets/naiwa/models/entity/naiwa.nwm';
+const lodOnly = process.argv.includes('--lod-only');
+if (lodOnly || process.argv.includes('--check')) {
   const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
   assert.equal(manifest.sourceSha256, sha256, '模型已变化，请先运行 bake-model.mjs 重新采样');
+  assert.equal(manifest.normalSha256 ?? null, normalSha256, '局部法线源已变化，请先重新采样');
+  assert.ok(manifest.files[modelPath], '采样清单缺少高模');
+  if (!lodOnly) assert.ok(manifest.files[lodPath], '采样清单缺少低模，请运行 bake-model.mjs --lod-only');
   for (const [file, digest] of Object.entries(manifest.files)) {
+    if (lodOnly && file === lodPath) continue;
     assert.equal(createHash('sha256').update(await fs.readFile(path.join(output, file))).digest('hex'), digest, '采样产物损坏：' + file);
   }
-  console.log('模型源文件与采样产物 SHA256 一致');
+  if (lodOnly) {
+    // 高模已通过原采样清单检查，直接离线派生低模，无需重复启动 Blockbench。
+    const {bytes, ...stats} = await simplifyModel(await fs.readFile(path.join(output, modelPath)));
+    await fs.writeFile(path.join(output, lodPath), bytes);
+    manifest.lod = stats;
+    manifest.files[lodPath] = createHash('sha256').update(bytes).digest('hex');
+    await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+    console.log('低模采样完成：' + stats.vertices + ' 顶点、' + stats.triangles + ' 三角面');
+  } else console.log('模型源文件与采样产物 SHA256 一致');
   process.exit(0);
 }
-// 普通构建只校验已提交产物；重新采样才要求调用者指定编辑器。
-const blockbench=process.env.BLOCKBENCH;
-assert.ok(blockbench,'重新采样须用 BLOCKBENCH 指定 Blockbench 5.2.1；普通构建使用 --check');
 const model = JSON.parse(sourceBytes);
 const bones = model.elements.filter(e => e.type === 'armature_bone');
 const meshes = model.elements.filter(e => e.type === 'mesh');
@@ -33,6 +51,8 @@ const mesh = meshes[0], vertexKeys = Object.keys(mesh.vertices);
 assert.deepEqual(mesh.origin, [0,0,0], '接入网格原点必须归零');
 assert.deepEqual(mesh.rotation, [0,0,0], '接入网格不能保留对象旋转');
 const vertexIndex = new Map(vertexKeys.map((key, i) => [key, i]));
+const normalOverrides = normalSource ? JSON.parse(normalSource) : null;
+if (normalOverrides) assert.equal(normalOverrides.sourceSha256, sha256, '局部法线与源网格不匹配，请重新核对修形区域');
 const work = path.join(project, '.bake-work');
 await fs.mkdir(work, {recursive: true});
 // 独立用户目录避免改动其它工程和插件配置。
@@ -42,6 +62,9 @@ const port = await new Promise((resolve, reject) => {
 });
 const env = {...process.env}; delete env.ELECTRON_RUN_AS_NODE;
 const log = await fs.open(path.join(work, 'blockbench.log'), 'w');
+// 普通构建只校验采样产物，重新采样才需要调用者指定编辑器。
+const blockbench = process.env.BLOCKBENCH;
+assert.ok(blockbench, '重新采样须用 BLOCKBENCH 指定 Blockbench 5.2.1；普通构建使用 --check');
 const child = spawn(blockbench,
   ['--userData', path.join(work, 'userdata'), '--remote-debugging-port=' + port, '--remote-debugging-address=127.0.0.1'],
   {cwd: project, env, windowsHide: true, stdio: ['ignore', log.fd, log.fd]});
@@ -126,8 +149,8 @@ try {
     console.log('已采样 ' + clip.name + '：' + frameCount + ' 帧');
   }
   // 使用编辑器实际计算的顶点作为独立对照，测试游戏端矩阵布局、权重及采样时间。
-  // 新增手指骨的最高权重点也纳入原生对照，避免只采躯干而漏检飞升手势。
-  const checkIndices = [...new Set([0,100,500,1000,2000,vertexKeys.length-1,...bones.filter(b=>b.name.startsWith('finger_relax_')).map(bone=>{
+  // 手指和新增脸骨分别采最高权重点，覆盖飞升手势及眨眼、张嘴的变形。
+  const checkIndices = [...new Set([0,100,500,1000,2000,vertexKeys.length-1,...bones.filter((b,i)=>b.name.startsWith('finger_relax_')||(i>=38&&i<=51)).map(bone=>{
     const weight=key=>bone.vertex_weights?.[mesh.uuid.slice(0,6)+':'+key]??bone.vertex_weights?.[key]??0;
     return vertexKeys.reduce((best,key,index)=>weight(key)>weight(vertexKeys[best])?index:best,0);
   })])];
@@ -174,6 +197,14 @@ try {
     }
     for (let j = 0; j < 3; j++) normals[i + j] /= length;
   }
+  // 只替换修形区明确提供的单位法线。其余顶点沿用邻接面的面积加权法线。
+  for (const [key, vector] of Object.entries(normalOverrides?.normals ?? {})) {
+    const index = vertexIndex.get(key);
+    assert.ok(referencedVertices.has(index) && Array.isArray(vector) && vector.length === 3 &&
+      vector.every(Number.isFinite) && Math.abs(Math.hypot(...vector) - 1) < 1e-6,
+      '局部法线对应的顶点或向量无效：' + key);
+    for (let axis = 0; axis < 3; axis++) normals[index * 3 + axis] = vector[axis];
+  }
   // NAIWA001 使用大端 int32/float32 和行主序 3×4 骨矩阵；字段顺序须与 NaiwaMesh 读取器同步。
   const chunks = [];
   const int = value => {const b = Buffer.allocUnsafe(4); b.writeInt32BE(value); chunks.push(b);};
@@ -187,9 +218,18 @@ try {
     const name = Buffer.from(clip.name, 'utf8'); int(name.length); chunks.push(name);
     float(clip.length); int(clip.loop ? 1 : 0); int(clip.frameCount); clip.matrices.forEach(float);
   }
-  await write('assets/naiwa/models/entity/naiwa.nwm', Buffer.concat(chunks));
-  await fs.writeFile(manifestPath, JSON.stringify({sourceSha256: sha256, fps, bones: bones.length, vertices: vertexKeys.length, triangles: faces.length,
-    clips: clips.map(({matrices, ...clip}) => clip), files}, null, 2) + '\n');
+  const highModel = Buffer.concat(chunks);
+  const {bytes: lowModel, ...lod} = await simplifyModel(highModel);
+  await write(modelPath, highModel);
+  await write(lodPath, lowModel);
+  // 材质减少时只清理本生成器的过期编号贴图，避免旧贴图继续被打进成品。
+  const textureDir = 'assets/naiwa/textures/entity';
+  for (const name of await fs.readdir(path.join(output, textureDir))) {
+    const relative = textureDir + '/' + name;
+    if (/^naiwa_\d+\.png$/.test(name) && !(relative in files)) await fs.unlink(path.join(output, relative));
+  }
+  await fs.writeFile(manifestPath, JSON.stringify({sourceSha256: sha256, normalSha256, fps, bones: bones.length, vertices: vertexKeys.length, triangles: faces.length,
+    clips: clips.map(({matrices, ...clip}) => clip), lod, files}, null, 2) + '\n');
   assert.equal(createHash('sha256').update(await fs.readFile(source)).digest('hex'), sha256, '原模型被修改');
   console.log('采样完成：' + vertexKeys.length + ' 顶点、' + faces.length + ' 三角面、' + clips.length + ' 段动画；原文件未修改');
 } finally {

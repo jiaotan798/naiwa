@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.naiwa.NaiwaAnimations;
 import com.naiwa.NaiwaEntity;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -14,6 +15,7 @@ import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.Items;
 
@@ -21,6 +23,8 @@ import net.minecraft.world.item.Items;
 public final class NaiwaRenderer extends EntityRenderer<NaiwaEntity,NaiwaRenderer.State> {
     private final ItemModelResolver items;
     private final NaiwaModel model = new NaiwaModel();
+    private final NaiwaModel simplifiedModel = new NaiwaModel(model);
+    private final NaiwaDetail detail = new NaiwaDetail();
 
     public NaiwaRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -31,7 +35,7 @@ public final class NaiwaRenderer extends EntityRenderer<NaiwaEntity,NaiwaRendere
     public static final class State extends EntityRenderState {
         NaiwaAnimations.ClipTime clip;
         String action;
-        boolean crouched, holdingBook, hurt;
+        boolean crouched, holdingBook, hurt, simplified;
         float bodyYaw, pitch;
         final ItemStackRenderState prop = new ItemStackRenderState();
     }
@@ -48,6 +52,13 @@ public final class NaiwaRenderer extends EntityRenderer<NaiwaEntity,NaiwaRendere
         state.action = entity.act();
         state.crouched = entity.isShiftKeyDown();
         state.holdingBook = entity.getMainHandItem().is(Items.ENCHANTED_BOOK);
+        // 延迟提交时可能正在绘制阴影；先按主镜头确定精度，箱沿切面和手掌道具锚点固定使用高模。
+        var client = Minecraft.getInstance();
+        var camera = client.gameRenderer.getMainCamera();
+        state.simplified = !state.holdingBook && !state.action.equals("chest_peek") && camera.isInitialized()
+                && !(camera.entity() instanceof Player player && player.isScoping())
+                && detail.useSimplified(entity, camera.position().distanceToSqr(state.x,state.y,state.z),
+                        client.getWindow().getHeight(), camera.getFov());
         state.hurt = entity.hurtTime>0 || entity.deathTime>0;
         state.bodyYaw = Mth.rotLerp(partial,entity.yBodyRotO,entity.yBodyRot);
         state.pitch = entity.getXRot();
@@ -69,7 +80,8 @@ public final class NaiwaRenderer extends EntityRenderer<NaiwaEntity,NaiwaRendere
                 pose.translate(0,-.25,0);
                 pose.scale(.9F,.9F,.9F);
             }
-            model.submit(state.clip.name(),state.clip.seconds(),pose,collector,state.lightCoords,OverlayTexture.pack(0,state.hurt),
+            var geometry = state.simplified ? simplifiedModel : model;
+            geometry.submit(state.clip.name(),state.clip.seconds(),pose,collector,state.lightCoords,OverlayTexture.pack(0,state.hurt),
                     chest ? 4 : 0,state.action,state.pitch,state.holdingBook,-1);
             if (chest) pose.popPose();
             if (state.holdingBook || state.action.startsWith("mine")) {

@@ -1,5 +1,6 @@
 package com.naiwa;
 
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -22,6 +23,12 @@ public final class NaiwaGameTests {
 
     @GameTest(template="empty", timeoutTicks=30)
     public static void registrationAndAnimationCommand(GameTestHelper helper) {
+        // 查专服实际加载的群系列表，可发现旧群系修饰器误入成品。
+        var type = Naiwa.ENTITY.get();
+        for (var biome : helper.getLevel().registryAccess().registryOrThrow(Registries.BIOME)) {
+            helper.assertTrue(biome.getMobSettings().getMobs(type.getCategory()).unwrap().stream()
+                    .noneMatch(entry -> entry.type == type), "奶蛙不应出现在群系自然生成池");
+        }
         var entity = spawn(helper);
         helper.assertTrue(entity.getMaxHealth() == 20 && entity.animation().equals("auto"), "奶蛙属性和默认状态正确注册");
         var source = helper.getLevel().getServer().createCommandSourceStack().withLevel(helper.getLevel());

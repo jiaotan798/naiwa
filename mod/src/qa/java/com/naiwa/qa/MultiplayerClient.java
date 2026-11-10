@@ -20,6 +20,17 @@ public final class MultiplayerClient {
     private int last=-2,wait,ticks;
     private boolean done;
     public MultiplayerClient() {NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post e)->tick());}
+    /** RenderType 初始化依赖客户端注册表，在真实客户端启动后再核对成品的拓扑、实体格式和轮廓。 */
+    private static void requireTriangleBody() throws Exception {
+        var layer=Class.forName("com.naiwa.client.NaiwaModel$ModelLayer");
+        var body=layer.getDeclaredMethod("body",net.minecraft.resources.ResourceLocation.class);
+        body.setAccessible(true);
+        var type=(net.minecraft.client.renderer.RenderType)body.invoke(null,
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("naiwa","textures/entity/naiwa_0.png"));
+        MultiplayerCheck.require(type.mode()==com.mojang.blaze3d.vertex.VertexFormat.Mode.TRIANGLES
+                &&type.format()==com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY
+                &&type.outline().isEmpty(),"实体三角形不能被直接提交到原版四边形轮廓缓冲");
+    }
     private void screenshot(Minecraft mc,int stage) throws Exception {
         try(var image=Screenshot.takeScreenshot(mc.getMainRenderTarget())) {image.writeToFile(MultiplayerCheck.ROOT.resolve(role+"-"+stage+".png"));}
     }
@@ -40,6 +51,7 @@ public final class MultiplayerClient {
             switch(stage) {
                 case 1 -> {
                     MultiplayerCheck.require(mc.getSingleplayerServer()==null && mc.level.players().size()==2,"必须连接专用服的两个真实玩家");
+                    requireTriangleBody();
                     var info=net.neoforged.fml.ModList.get().getModContainerById("naiwa").orElseThrow().getModInfo();
                     MultiplayerCheck.write(role+"-installation.txt",info.getVersion()+"\n"+info.getOwningFile().getFile().getFilePath()+"\n");
                     if (mc.level.getEntitiesOfClass(NaiwaEntity.class,mc.player.getBoundingBox().inflate(8),f->f.animation().equals("laugh_sequence")).isEmpty()) return;
@@ -95,6 +107,10 @@ public final class MultiplayerClient {
                     if(a==null) return;
                     MultiplayerCheck.require(a.isAlive() && !a.hasEffect(Naiwa.ASCENDING),"真实复活恢复玩家");
                     if(mc.level.getEntitiesOfClass(NaiwaEntity.class,a.getBoundingBox().inflate(10),f->f.animation().equals("laugh_sequence")).isEmpty()) return;
+                }
+                case 21 -> {
+                    var glowing=mc.level.getEntitiesOfClass(NaiwaEntity.class,mc.player.getBoundingBox().inflate(8),NaiwaEntity::isCurrentlyGlowing);
+                    if(glowing.isEmpty())return;
                 }
             }
             screenshot(mc,stage);MultiplayerCheck.write(role+"-"+stage+".ok","PASS");
