@@ -1,7 +1,5 @@
-# 独立验收探针
+# 客户端验收探针
 
-在仓库根目录运行 `./scripts/gradle.ps1 qaJar` 编译独立验收探针，产物为 `mod/build/qa/naiwa-qa.jar`。
+在仓库根目录运行 `./scripts/gradle.ps1 qaJar`，可把探针编译为 `mod/build/qa/naiwa-qa.jar`。探针覆盖飞升、手部显示、望远镜、笑气粒子、整蛊、背包、音效和渲染采样。
 
-探针覆盖飞升、手部恢复、望远镜、笑气粒子、整蛊、背包、音效和渲染采样。运行探针需要独立专服、客户端及配套测试夹具。
-
-常规源码验证使用 `./scripts/gradle.ps1 build runGameTestServer`。 [0.5.0 验证记录](../../../validation/0.5.0.md)
+完整运行需要独立专服、客户端、启动器和测试夹具。公开仓库提供探针源码和编译入口。验证服务端玩法可直接运行 `./scripts/gradle.ps1 build runGameTestServer`。 [0.5.0 验证](../../../validation/0.5.0.md)
