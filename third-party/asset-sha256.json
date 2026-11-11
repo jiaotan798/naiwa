@@ -1,22 +1,47 @@
 {
-  "version": "0.5.0",
+  "version": "0.5.1",
   "date": "2026-11-11",
   "meaning": "当前交付生产素材与可编辑源文件的识别摘要，不替代许可",
   "files": [
     {
       "path": "assets/runtime/assets/naiwa/models/entity/naiwa.nwm",
-      "bytes": 5182588,
-      "sha256": "2875d9b024efa6adf928df3805ac402058a14304b98bbe216be55b426e32831e"
+      "bytes": 2673944,
+      "sha256": "f3b5d0fca28acda079a903a30e28eef09f2a1abdb684726d4545190ac86ebafc"
     },
     {
       "path": "assets/runtime/assets/naiwa/models/entity/naiwa_lod.nwm",
-      "bytes": 3481520,
-      "sha256": "94a30b9002612f8428a6a52e882bbd5da246e431a9b1acf3f7172b8875e99cbd"
+      "bytes": 2349196,
+      "sha256": "118837245c9808b4dcaa93402b07a1a7a4eb270fbb4c3486fe7cb8939b9ebfa2"
     },
     {
       "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_0.png",
       "bytes": 2009169,
       "sha256": "42df551d598c2ad9211e8aef5258c49bc97aa4295614d4f8d4701ade64c57493"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_1.png",
+      "bytes": 4306,
+      "sha256": "2ab58b933d2fe40d3267144bfd258c03f8704fde7745259d9fb6ae42b09ef6d1"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_2.png",
+      "bytes": 75254,
+      "sha256": "862ca68d2048daf2e9416f31503fa00ed72f2214a62d89d1cf4f28705d200756"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_3.png",
+      "bytes": 56024,
+      "sha256": "0aaa3d575e498575d58e9e6bec5385441c289b5f7e3b7868cc3da1e494a71dc3"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_4.png",
+      "bytes": 1913123,
+      "sha256": "da0c3265f48b7dac28f7c6904f20821afba2b20bceaeac68d9784846cbaf1276"
+    },
+    {
+      "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_5.png",
+      "bytes": 102,
+      "sha256": "f4e3cc68d8d9652c1561c0327e2735d1dc07b58a9f05a1927298fb9f6a2ab042"
     },
     {
       "path": "assets/shield/naiwa-shield-v1.png",
@@ -25,13 +50,13 @@
     },
     {
       "path": "assets/source/nailong_face_normals.json",
-      "bytes": 21789,
-      "sha256": "26ffe6b54b1e907cb3e44db7982f385652329ca866f266a196897c32bd778071"
+      "bytes": 155148,
+      "sha256": "81b9ee809b3cc7b4a5e1de0f303529d5783662f91b61c6321927790938ed31b9"
     },
     {
       "path": "assets/source/nailong_origin_zero.bbmodel",
-      "bytes": 14752327,
-      "sha256": "b79d10ce2a50decaccb094c4a313cf8214757874a9edaa92a76db53c019fdfa0"
+      "bytes": 8665698,
+      "sha256": "d60718f55436410428eb801c7b031370aa8c8d6010e899cbb143c53cc10d11a2"
     },
     {
       "path": "mod/src/main/resources/assets/naiwa/sounds/laugh_full.ogg",

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 
 export const lodPath = 'assets/naiwa/models/entity/naiwa_lod.nwm';
-const targetFaces = 10000;
 
 /** 复用高模材质和蒙皮。UV 缝两侧先拆成独立角点，简化后仍按源顶点合并几何。 */
 export async function simplifyModel(source) {
@@ -11,7 +10,9 @@ export async function simplifyModel(source) {
   assert.ok(MeshoptSimplifier.supported, '网格简化需要支持 WebAssembly 的 Node.js');
   assert.equal(source.toString('ascii', 0, 8), 'NAIWA001');
   const count = source.readInt32BE(8), materials = source.readInt32BE(16), faces = source.readInt32BE(20);
-  assert.ok(count > 0 && materials > 0 && faces > targetFaces, '高模面数不足或模型无效');
+  assert.ok(count > 0 && materials > 0 && faces > 0, '模型数据无效');
+  // 小网格同样按比例派生，避免换回七千面模型后仍使用一万面的简化目标。
+  const targetFaces = Math.min(10000, Math.max(1, Math.floor(faces / 3)));
   const header = 28, normals = header + count * 12;
   const weights = [];
   let cursor = normals + count * 12;

@@ -20,6 +20,7 @@ import org.lwjgl.glfw.GLFW;
 final class LaughSyncClient {
     private final String role=System.getProperty("naiwa.qa.role");
     private final boolean actor=role.equals("actor");
+    private final boolean faceClose=Boolean.getBoolean("naiwa.qa.faceClose");
     private final ConcurrentLinkedQueue<SoundStarted> sounds=new ConcurrentLinkedQueue<>();
     private final List<String> samples=new ArrayList<>();
     private NaiwaMesh mesh;
@@ -71,8 +72,14 @@ final class LaughSyncClient {
             if(phase!=last){last=phase;age=sample=repeat=soundCount=0;seen=false;soundStart=-1;sound=null;samples.clear();}
             age++;
             var frog=(NaiwaEntity)mc.level.getEntity(Integer.parseInt(Files.readString(MultiplayerCheck.ROOT.resolve("laugh-entity.txt"))));if(frog==null)return;
-            Vec3 d=frog.position().add(0,1.1,0).subtract(mc.player.getEyePosition());mc.player.setYRot((float)Math.toDegrees(Math.atan2(-d.x,d.z)));mc.player.setXRot((float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));
-            if(phase%2==1){if(age>=20)MultiplayerCheck.write(role+"-"+phase+".ok","PASS ready\n");return;}
+            // 面部验收保持原机位和动画时钟，仅收窄视场并对准下脸，便于核对细小折痕。
+            if(faceClose){mc.options.fov().set(30);require(mc.options.fov().get()==30,"面部验收须使用有效的 30° 视场");}
+            Vec3 d=frog.position().add(0,faceClose?1.7:1.1,0).subtract(mc.player.getEyePosition());mc.player.setYRot((float)Math.toDegrees(Math.atan2(-d.x,d.z)));mc.player.setXRot((float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));
+            if(phase%2==1){
+                // 面部近景首次出现实体后预热 5 秒，再开始音画验收；原有 0.2 秒时钟阈值保持不变。
+                int readyAfter=faceClose&&phase==1?100:20;
+                if(age>=readyAfter)MultiplayerCheck.write(role+"-"+phase+".ok","PASS ready\n");return;
+            }
             boolean full=phase!=6;double seconds=frog.animationSeconds(0);
             if(!frog.animation().equals("auto"))seen=true;
             if(actor&&phase==2&&(!seen||repeat<2&&seconds>1+repeat*2)){

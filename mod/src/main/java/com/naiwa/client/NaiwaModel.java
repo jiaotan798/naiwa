@@ -91,7 +91,7 @@ final class NaiwaModel {
     void translateRightHand(PoseStack pose) {
         pose.translate(rightHand[0],rightHand[1],rightHand[2]);
     }
-
+    /** 按演员动作蒙皮并原位变换工作数组，再按材质提交；仅完整本体主画面剔除不透明背面，特殊路径保持双面。 */
     private void draw(String clip,double seconds,PoseStack pose,MultiBufferSource buffers,int light,int overlay,int mask,String action,float pitch,boolean holdingBook,float flightReveal) {
         long profileStart = NaiwaRenderProfile.ENABLED ? System.nanoTime() : 0;
         boolean headOnly=mask==1||mask==4;
@@ -112,11 +112,19 @@ final class NaiwaModel {
         }
         var transform=pose.last();
         var view=com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix();
+        // 阴影采用另一投影；头部、轮廓、飞升及镜像变换仍走双面路径，只剔除完整本体主画面的不透明背面。
+        boolean cull=mask==0&&flightReveal<0&&!(buffers instanceof OutlineBufferSource)
+                &&!NaiwaShadowPass.active()&&transform.pose().determinant3x3()>0;
+        float minX=Float.POSITIVE_INFINITY,minY=minX,minZ=minX,maxX=Float.NEGATIVE_INFINITY,maxY=maxX,maxZ=maxX;
         for (int index=0;index<(headOnly?mesh.headVertices.length:mesh.vertexCount);index++) {
             int i=(headOnly?mesh.headVertices[index]:index)*3;
             float incidence=flightReveal>=0?NaiwaAscensionShapes.incidence(normals[i],normals[i+1],normals[i+2]):0;
             vector.set(positions[i]/16,(positions[i+1]+yOffset)/16,positions[i+2]/16); transform.pose().transformPosition(vector);
             positions[i]=vector.x; positions[i+1]=vector.y; positions[i+2]=vector.z;
+            if(cull){
+                minX=Math.min(minX,vector.x);minY=Math.min(minY,vector.y);minZ=Math.min(minZ,vector.z);
+                maxX=Math.max(maxX,vector.x);maxY=Math.max(maxY,vector.y);maxZ=Math.max(maxZ,vector.z);
+            }
             vector.set(normals[i],normals[i+1],normals[i+2]); transform.normal().transform(vector).normalize();
             normals[i]=vector.x;normals[i+1]=vector.y;normals[i+2]=vector.z;
             if(flightReveal>=0) {
@@ -126,6 +134,7 @@ final class NaiwaModel {
                 NaiwaAscensionShapes.light(incidence,facing,flightReveal,flightLight,i);
             }
         }
+        cull&=NaiwaFaceCulling.outside(minX,minY,minZ,maxX,maxY,maxZ);
         long profileTransform = NaiwaRenderProfile.ENABLED ? System.nanoTime() : 0;
         boolean flight=flightReveal>=0;
         // 原版轮廓缓冲按四边形同时读取实体顶点，发光时整批沿用原版配对的实体与轮廓类型。
@@ -136,8 +145,9 @@ final class NaiwaModel {
             var type=flight?flightTypes[material]:outline?RenderType.entityCutoutNoCull(textures[material]):bodyTypes[material];
             var consumer=buffers.getBuffer(type);
             int[] faces = (headOnly ? headMaterialFaces : materialFaces)[material];
-            if (NaiwaRenderProfile.ENABLED) profileFaces += faces.length;
             for (int face : faces) {
+                if(cull&&NaiwaFaceCulling.opaque(material)&&NaiwaFaceCulling.backFacing(positions,mesh.corners,face))continue;
+                if(NaiwaRenderProfile.ENABLED)profileFaces++;
                 for(int corner=0;corner<corners;corner++) {
                     int local=Math.min(corner,2),p=mesh.corners[face*3+local]*3,u=face*6+local*2;
                     consumer.addVertex(positions[p],positions[p+1],positions[p+2]);

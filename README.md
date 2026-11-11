@@ -1,10 +1,10 @@
 # 《奶蛙》
 
-> 奶蛙爱在你挖矿、钓鱼或开门时捣乱，被发现了还会捧腹大笑。**v0.5.0** 换用带面部骨骼的新模型，补全游戏内简介，并关闭群系自然生成。你仍会在整蛊时遇见它。
+> 奶蛙爱在你挖矿、钓鱼或开门时捣乱，被发现了还会捧腹大笑。**v0.5.1** 调整脸颊与颈部模型，降低模型绘制负担，并减少 1.21.1 版同屏多只奶蛙时的顶点提交。
 
 ## 下载与安装
 
-从 [v0.5.0 Release](https://github.com/jiaotan798/naiwa/releases/tag/v0.5.0) 下载与你的 Minecraft 版本和加载器相符的 JAR。
+从 [v0.5.1 Release](https://github.com/jiaotan798/naiwa/releases/tag/v0.5.1) 下载与你的 Minecraft 版本和加载器相符的 JAR。
 
 | Minecraft | 加载器 | 安装位置 | 前置模组 |
 | --- | --- | --- | --- |
@@ -15,7 +15,7 @@
 | 26.1.2 | NeoForge 26.1.2.94 | 客户端及服务端 | 无 |
 | 26.1.2 | Fabric Loader 0.19.4 | 客户端及服务端 | Fabric API 0.149.0+26.1.2 |
 
-把 JAR 和所需前置模组放进实例的 `mods` 目录。联机时，客户端和服务端安装同一版本。 [Java 版本和升级步骤](https://github.com/jiaotan798/naiwa/releases/download/v0.5.0/INSTALL.md)
+把 JAR 和所需前置模组放进实例的 `mods` 目录。联机时，客户端和服务端安装同一版本。 [Java 版本和升级步骤](INSTALL.md)
 
 ## 玩法
 
@@ -34,7 +34,7 @@
 .\mod\gradlew.bat -p mod build
 ```
 
-主端产物为 `mod/build/libs/naiwa-0.5.0.jar`。 [六端构建说明](ports/README.md)
+主端产物为 `mod/build/libs/naiwa-0.5.1.jar`。 [六端构建说明](ports/README.md)
 
 ## 反馈
 

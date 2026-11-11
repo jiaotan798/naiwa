@@ -8,7 +8,7 @@
 
 | 内容 | 文件与用途 |
 | --- | --- |
-| 可编辑模型和修形法线 | [模型源文件](assets/source/README.md)随源码提供。52 根骨骼、一张贴图和 11 段动画用于生成游戏资源。 |
+| 可编辑模型和修形法线 | [模型源文件](assets/source/README.md)随源码提供。38 根骨骼、六张贴图和 11 段动画用于生成游戏资源。 |
 | 游戏模型和实体贴图 | `assets/runtime/` 中的高模、低模和贴图进入成品。模型摘要和姿态对照供构建校验使用。 |
 | 盾牌源图 | [naiwa-shield-v1.png](assets/shield/naiwa-shield-v1.png)用于维护盾面和把手的贴图。 |
 | 物品与状态图标 | 由 `scripts/make-icons.mjs` 中的像素稿生成。 |
@@ -25,3 +25,5 @@
 主工程使用 Gradle 9.2.1 Wrapper，Forge 1.20.1 使用 Gradle 8.8 Wrapper。Gradle Wrapper 的原始 Apache-2.0 许可随源码保留。 [许可原文](third-party/gradle-wrapper-LICENSE.txt)
 
 构建所需的加载器和插件由 Gradle 按工程配置获取。Forge 1.20.1 成品内嵌 MixinExtras Forge 0.4.1，相关上游声明随依赖保留。 [构建环境](ports/README.md)
+
+低模生成使用 [meshoptimizer 0.25.0](https://github.com/zeux/meshoptimizer/tree/v0.25) 的简化器，版权归 Arseny Kapoulkine，按 MIT 许可随采样脚本提供。该工具只在重新生成网格时使用，不进入游戏成品。 [许可原文](scripts/vendor/meshoptimizer/LICENSE.md)

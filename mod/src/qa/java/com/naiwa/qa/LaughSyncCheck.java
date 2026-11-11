@@ -24,6 +24,14 @@ final class LaughSyncCheck {
         if(frog!=null)frog.discard();
         for(var p:new ServerPlayer[]{actor,viewer}){NaiwaPranks.cancel(p);NaiwaGameplay.cleanup(p);p.getInventory().clearContent();p.setGameMode(GameType.SURVIVAL);p.getPersistentData().putLong("naiwa.prank_next",Long.MAX_VALUE);}
         actor.connection.teleport(.5,81,3.2,180,10);viewer.connection.teleport(2.5,81,3.2,144,10);
+        // 最后一个单片段回合降低观察者脚下平台，真实仰视下颌和前颈；不改变前两轮交互与盾牌验收。
+        if(Boolean.getBoolean("naiwa.qa.faceClose")&&phase==4){
+            for(int x=-1;x<=1;x++)for(int z=2;z<=4;z++){
+                actor.serverLevel().setBlockAndUpdate(new BlockPos(x,80,z),Blocks.AIR.defaultBlockState());
+                actor.serverLevel().setBlockAndUpdate(new BlockPos(x,79,z),Blocks.SMOOTH_STONE.defaultBlockState());
+            }
+            actor.connection.teleport(.5,80,3.2,180,0);
+        }
         frog=Naiwa.ENTITY.get().create(actor.level());frog.setNoAi(true);frog.setPos(.5,81,.5);actor.serverLevel().addFreshEntity(frog);
         MultiplayerCheck.write("laugh-entity.txt",Integer.toString(frog.getId()));
     }

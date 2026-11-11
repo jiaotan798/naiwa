@@ -1,10 +1,10 @@
 {
-  "sourceSha256": "b79d10ce2a50decaccb094c4a313cf8214757874a9edaa92a76db53c019fdfa0",
-  "normalSha256": "26ffe6b54b1e907cb3e44db7982f385652329ca866f266a196897c32bd778071",
+  "sourceSha256": "d60718f55436410428eb801c7b031370aa8c8d6010e899cbb143c53cc10d11a2",
+  "normalSha256": "81b9ee809b3cc7b4a5e1de0f303529d5783662f91b61c6321927790938ed31b9",
   "fps": 50,
-  "bones": 52,
-  "vertices": 18078,
-  "triangles": 36001,
+  "bones": 38,
+  "vertices": 4685,
+  "triangles": 9207,
   "clips": [
     {
       "name": "idle",
@@ -73,16 +73,21 @@
       "frameCount": 31
     }
   ],
+  "lod": {
+    "vertices": 2222,
+    "triangles": 4343,
+    "protectedFaces": 2999,
+    "error": 0.011645563878118992
+  },
   "files": {
     "assets/naiwa/textures/entity/naiwa_0.png": "42df551d598c2ad9211e8aef5258c49bc97aa4295614d4f8d4701ade64c57493",
-    "native-pose-checks.json": "f1f16793a541a5c5ee342a0f622682ea881cc955c27e4124956db5a3abb00434",
-    "assets/naiwa/models/entity/naiwa.nwm": "2875d9b024efa6adf928df3805ac402058a14304b98bbe216be55b426e32831e",
-    "assets/naiwa/models/entity/naiwa_lod.nwm": "94a30b9002612f8428a6a52e882bbd5da246e431a9b1acf3f7172b8875e99cbd"
-  },
-  "lod": {
-    "vertices": 5077,
-    "triangles": 9999,
-    "protectedFaces": 4295,
-    "error": 0.0017591690411791205
+    "assets/naiwa/textures/entity/naiwa_1.png": "2ab58b933d2fe40d3267144bfd258c03f8704fde7745259d9fb6ae42b09ef6d1",
+    "assets/naiwa/textures/entity/naiwa_2.png": "862ca68d2048daf2e9416f31503fa00ed72f2214a62d89d1cf4f28705d200756",
+    "assets/naiwa/textures/entity/naiwa_3.png": "0aaa3d575e498575d58e9e6bec5385441c289b5f7e3b7868cc3da1e494a71dc3",
+    "assets/naiwa/textures/entity/naiwa_4.png": "da0c3265f48b7dac28f7c6904f20821afba2b20bceaeac68d9784846cbaf1276",
+    "assets/naiwa/textures/entity/naiwa_5.png": "f4e3cc68d8d9652c1561c0327e2735d1dc07b58a9f05a1927298fb9f6a2ab042",
+    "native-pose-checks.json": "5b1f1a6417e4a0c5170f7c56871e9314ecc790b193662fb34fb0ef06bad4bb94",
+    "assets/naiwa/models/entity/naiwa.nwm": "f3b5d0fca28acda079a903a30e28eef09f2a1abdb684726d4545190ac86ebafc",
+    "assets/naiwa/models/entity/naiwa_lod.nwm": "118837245c9808b4dcaa93402b07a1a7a4eb270fbb4c3486fe7cb8939b9ebfa2"
   }
 }
