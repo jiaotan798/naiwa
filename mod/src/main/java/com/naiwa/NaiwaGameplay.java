@@ -100,6 +100,11 @@ public final class NaiwaGameplay {
         return level.clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,net.minecraft.world.phys.shapes.CollisionContext.empty())).getType()==HitResult.Type.MISS;
     }
 
+    /** 投掷物传入自身，旧版移植可据此构造非空碰撞上下文；当前版本沿用世界射线规则。 */
+    public static boolean clearLine(net.minecraft.world.entity.Entity observer, Vec3 from, Vec3 to) {
+        return clearLine(observer.level(),from,to);
+    }
+
     /** 仅主背包、快捷栏和副手计入携带；不遍历容器，瓶数不改变漏气频率。 */
     static boolean carrying(ServerPlayer player) {
         var inventory=player.getInventory();Integer cached=GAS_SLOTS.get(player);

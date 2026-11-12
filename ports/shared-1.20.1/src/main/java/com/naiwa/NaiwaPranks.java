@@ -200,7 +200,7 @@ public final class NaiwaPranks {
         Vec3 look=Vec3.directionFromRotation(0,p.getYRot());
         for(double radius:new double[]{3,2,4})for(double angle:new double[]{Math.PI,2.4,-2.4})for(int dy:new int[]{0,1,-1}) {
             Vec3 point=Vec3.atBottomCenterOf(BlockPos.containing(p.position().add(look.yRot((float)angle).scale(radius))).above(dy));
-            if(!safe(p.serverLevel(),point,true)||!NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),point.add(0,1.5,0))
+            if(!safe(p.serverLevel(),point,true)||!NaiwaGameplay.clearLine(p,p.getEyePosition(),point.add(0,1.5,0))
                     ||p.getLookAngle().dot(point.add(0,1.5,0).subtract(p.getEyePosition()).normalize())>.2)continue;
             NaiwaEntity frog=create(p.serverLevel(),point);if(frog==null)continue;
             begin(p,"creeper",frog,null);frog.setAct("creeper_wait");frog.play("idle");
@@ -232,7 +232,7 @@ public final class NaiwaPranks {
         // 优先沿视线，受矿壁阻挡时检查两侧及身后；整段路径仍禁止坑、液体和危险方块。
         for(double angle:new double[]{0,Math.PI/4,-Math.PI/4,Math.PI/2,-Math.PI/2,Math.PI*3/4,-Math.PI*3/4,Math.PI}) {
             Vec3 direction=facing.yRot((float)angle),first=p.position().add(direction.scale(3.5)),actorPoint=p.position().add(direction.scale(7));
-            if(!lurePath(p.serverLevel(),p.position(),actorPoint)||!NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),first.add(0,.3,0)))continue;
+            if(!lurePath(p.serverLevel(),p.position(),actorPoint)||!NaiwaGameplay.clearLine(p,p.getEyePosition(),first.add(0,.3,0)))continue;
             NaiwaEntity frog=prepareActor(p.serverLevel(),actorPoint);if(frog==null)continue;
             NaiwaDecoy decoy=Naiwa.DECOY.get().create(p.level());decoy.setPos(first);
             if(!p.serverLevel().addFreshEntity(decoy))return false;
@@ -258,7 +258,7 @@ public final class NaiwaPranks {
         Vec3 forward=Vec3.directionFromRotation(0,p.getYRot()),point=null;
         for(int dy:new int[]{0,-1,1,-2,2}) {
             Vec3 candidate=p.position().add(forward.scale(4)).add(0,dy,0);
-            if(safe(p.serverLevel(),candidate,true)&&NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),candidate.add(0,1.7,0))){point=candidate;break;}
+            if(safe(p.serverLevel(),candidate,true)&&NaiwaGameplay.clearLine(p,p.getEyePosition(),candidate.add(0,1.7,0))){point=candidate;break;}
         }
         if(point==null)return false;
         NaiwaEntity frog=prepareActor(p.serverLevel(),point);if(frog==null)return false;
@@ -316,7 +316,7 @@ public final class NaiwaPranks {
                     BlockPos feet=BlockPos.containing(candidate).above(dy);
                     Vec3 pos=Vec3.atBottomCenterOf(feet);
                     if (p.position().distanceToSqr(pos)<2) continue;
-                    if (safe(p.serverLevel(),pos,true) && (!visible || NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),pos.add(0,1,0)))
+                    if (safe(p.serverLevel(),pos,true) && (!visible || NaiwaGameplay.clearLine(p,p.getEyePosition(),pos.add(0,1,0)))
                             && (swimmer==null || fishPathClear(p.serverLevel(),swimmer,swimmer.position(),pos))) return pos;
                 }
             }
@@ -417,7 +417,7 @@ public final class NaiwaPranks {
             Vec3 horizontal=p.position().add(forward.yRot((float)angle).scale(radius));
             Vec3 point=new Vec3(horizontal.x,p.blockPosition().getY()+dy,horizontal.z);
             if(safe(p.serverLevel(),point,true)
-                    &&NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),point.add(0,1.4,0)))return point;
+                    &&NaiwaGameplay.clearLine(p,p.getEyePosition(),point.add(0,1.4,0)))return point;
         }
         return null;
     }
@@ -430,7 +430,7 @@ public final class NaiwaPranks {
             for(var local:level.getBlockState(pos).getCollisionShape(level,pos).toAabbs()) {
                 var box=local.move(pos);Vec3 point=new Vec3(net.minecraft.util.Mth.clamp(eye.x,box.minX,box.maxX),net.minecraft.util.Mth.clamp(eye.y,box.minY,box.maxY),net.minecraft.util.Mth.clamp(eye.z,box.minZ,box.maxZ));
                 // 终点略进入碰撞体，避免射线恰好落在面边界而漏判；视线被其他方块挡住则不能选它。
-            var hit=level.clip(new net.minecraft.world.level.ClipContext(eye,point.lerp(box.getCenter(),.001),net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,null));
+            var hit=level.clip(new net.minecraft.world.level.ClipContext(eye,point.lerp(box.getCenter(),.001),net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,frog));
                 double squared=eye.distanceToSqr(hit.getLocation());
                 if(hit.getType()==HitResult.Type.BLOCK&&hit.getBlockPos().equals(pos)&&squared<distance){distance=squared;nearest=hit;}
             }
@@ -446,7 +446,7 @@ public final class NaiwaPranks {
         Direction.Axis axis=block.getDirection().getAxis(); double plane=axis==Direction.Axis.X ? block.getBlockPos().getX()+.5 : block.getBlockPos().getZ()+.5;
         Vec3 point=mirrorPosition(p.position(),axis,plane);
         if (!safe(p.serverLevel(),point,true)) return;
-        if (!glassLine(p.serverLevel(),p.getEyePosition(),point.add(0,1.5,0),block.getBlockPos(),axis)) return;
+        if (!glassLine(p,p.getEyePosition(),point.add(0,1.5,0),block.getBlockPos(),axis)) return;
         NaiwaEntity frog=create(p.serverLevel(),point); if (frog==null) return;
         frog.setNoGravity(true); frog.setAct("mirror"); Scene scene=begin(p,"mirror",frog,block.getBlockPos());
         scene.axis=axis; scene.plane=plane; scene.side=coordinate(p.position(),axis)-plane;
@@ -467,11 +467,12 @@ public final class NaiwaPranks {
     }
 
     /** 光学上只忽略本次固定平面的普通玻璃，碰撞检查仍使用原玻璃形状。 */
-    private static boolean glassLine(ServerLevel level,Vec3 from,Vec3 to,BlockPos anchor,Direction.Axis axis) {
+    private static boolean glassLine(ServerPlayer p,Vec3 from,Vec3 to,BlockPos anchor,Direction.Axis axis) {
+        var level=p.serverLevel();
         Vec3 step=to.subtract(from).normalize().scale(.15); Vec3 cursor=from;
         boolean crossed=false;
         for (int i=0;i<100;i++) {
-            var hit=level.clip(new net.minecraft.world.level.ClipContext(cursor,to,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,null));
+            var hit=level.clip(new net.minecraft.world.level.ClipContext(cursor,to,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,p));
             if (hit.getType()==HitResult.Type.MISS) return crossed;
             BlockPos pos=hit.getBlockPos();
             if (!level.getBlockState(pos).is(Blocks.GLASS) || pos.get(axis)!=anchor.get(axis)) return false;
@@ -507,7 +508,7 @@ public final class NaiwaPranks {
         for(MockSpot candidate:candidates.spots) {
             Vec3 spot=candidate.position;
             // 不沿左右候选圈兜底，不加载新区块；完整身体、实体支撑和眼睛视线均通过后才入场。
-            if(!safe(p.serverLevel(),spot,true,candidate.feet,candidate.bounds)||!NaiwaGameplay.clearLine(p.level(),p.getEyePosition(),spot.add(0,1.5,0)))continue;
+            if(!safe(p.serverLevel(),spot,true,candidate.feet,candidate.bounds)||!NaiwaGameplay.clearLine(p,p.getEyePosition(),spot.add(0,1.5,0)))continue;
             NaiwaEntity frog=create(p.serverLevel(),spot);if(frog==null)continue;
             frog.setYRot(net.minecraft.util.Mth.wrapDegrees(p.getYRot()+180));frog.setYHeadRot(frog.getYRot());frog.yBodyRot=frog.getYRot();
             Scene scene=new Scene(p,"mock",frog,null,p.level().getGameTime());SCENES.put(p.getUUID(),scene);MOCK_CANDIDATES.remove(p.getUUID());scene.success(p);return true;
@@ -630,7 +631,7 @@ public final class NaiwaPranks {
                     if (!p.level().getBlockState(anchor).is(Blocks.GLASS) || (coordinate(p.position(),axis)-plane)*side<=0) return false;
                     Vec3 point=mirrorPosition(p.position(),axis,plane);
                     if (point.distanceToSqr(frog.position())>16 || !safe(p.serverLevel(),point,false)
-                            || !glassLine(p.serverLevel(),p.getEyePosition(),point.add(0,1.5,0),anchor,axis)) return false;
+                            || !glassLine(p,p.getEyePosition(),point.add(0,1.5,0),anchor,axis)) return false;
                     // 检查沿途碰撞，不能靠每 tick 改坐标越过狭窄墙体。
                     Vec3 delta=point.subtract(frog.position()); int steps=Math.max(1,(int)Math.ceil(delta.length()/.2));
                     for (int i=1;i<=steps;i++) if (!safe(p.serverLevel(),frog.position().add(delta.scale((double)i/steps)),false)) return false;

@@ -6,6 +6,9 @@ import net.minecraft.gametest.framework.GameTestHelper;
 @net.minecraftforge.gametest.PrefixGameTestTemplate(false)
 public final class LegacyGameTests {
     @GameTest(templateNamespace="naiwa",template="empty",timeoutTicks=40)
+    public static void raycastContext(GameTestHelper helper) {LegacyChecks.raycastContext(helper);}
+
+    @GameTest(templateNamespace="naiwa",template="empty",timeoutTicks=40)
     public static void totemAndRecipe(GameTestHelper helper) {LegacyChecks.totemAndRecipe(helper);}
 
     @GameTest(templateNamespace="naiwa",template="empty",timeoutTicks=40)

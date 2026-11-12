@@ -17,6 +17,18 @@ import net.minecraft.world.phys.Vec3;
 
 /** 测试实际使用旧版事件和 Mixin 的伤害、物品和配方入口。 */
 final class LegacyChecks {
+    /** 覆盖入服整蛊使用的射线构造，实际方块既能阻挡也能在移除后恢复通视。 */
+    static void raycastContext(GameTestHelper helper) {
+        var observer=helper.spawn(EntityType.COW,1,2,1);
+        var from=helper.absoluteVec(new Vec3(1.5,2.5,1.5));
+        var to=helper.absoluteVec(new Vec3(3.5,2.5,1.5));
+        helper.setBlock(2,2,1,net.minecraft.world.level.block.Blocks.GLASS);
+        helper.assertTrue(!NaiwaGameplay.clearLine(observer,from,to),"普通玻璃阻挡整蛊视线");
+        helper.setBlock(2,2,1,net.minecraft.world.level.block.Blocks.AIR);
+        helper.assertTrue(NaiwaGameplay.clearLine(observer,from,to),"移除遮挡后射线恢复通视");
+        helper.succeed();
+    }
+
     static void totemAndRecipe(GameTestHelper helper) {
         var level = helper.getLevel();
         var player = player(helper);

@@ -30,7 +30,7 @@ public final class LaughGasProjectile extends ThrowableItemProjectile {
             if (mob instanceof Enemy && mob.isAlive() && distanceToSqr(mob) <= 9 && !mob.getType().is(NaiwaGameplay.GAS_IMMUNE)
                     && !(mob instanceof net.minecraft.world.entity.OwnableEntity pet && pet.getOwnerUUID()!=null)
                     && (getOwner()==null || !mob.isAlliedTo(getOwner()))
-                    && NaiwaGameplay.clearLine(server, position(), mob.getEyePosition())) NaiwaGameplay.laugh(mob, 50);
+                    && NaiwaGameplay.clearLine(this, position(), mob.getEyePosition())) NaiwaGameplay.laugh(mob, 50);
         }
         discard();
     }

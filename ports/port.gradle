@@ -1,6 +1,16 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 
+/** 1.20.1 仅在 JSON 声明 attributes 时绑定输入位置，顺序必须与 POSITION_TEX_COLOR 相同。 */
+class LegacyShaderReader extends FilterReader {
+    LegacyShaderReader(Reader reader) {super(new StringReader(convert(reader)))}
+    private static String convert(Reader reader) {
+        def shader=new JsonSlurper().parse(reader)
+        shader.attributes=['Position','UV0','Color']
+        return JsonOutput.prettyPrint(JsonOutput.toJson(shader))
+    }
+}
+
 /** 26.1.2 的单物品配方原料为 ID 字符串；只转换共享图腾配方的原料表示。 */
 class ModernRecipeReader extends FilterReader {
     ModernRecipeReader(Reader reader) { super(new StringReader(convert(reader))) }
@@ -63,6 +73,8 @@ tasks.register('verifyModel', Exec) {
     commandLine 'node', file('../../scripts/bake-model.mjs'), '--check'
 }
 processResources {
+    // 自定义资源过滤器来自本脚本，转换规则变化时必须重新生成，不能复用旧版 JSON。
+    inputs.file(project.file('../port.gradle'))
     dependsOn verifyModel
     filteringCharset = 'UTF-8'
     inputs.property 'version', project.version.toString()
@@ -86,6 +98,9 @@ processResources {
         }
     }
     if (portGameVersion == '1.20.1') {
+        filesMatching(['assets/naiwa/shaders/core/flight_body.json','assets/naiwa/shaders/core/holy_light.json']) {
+            filter LegacyShaderReader
+        }
         from("${sourceAssets}/data/naiwa/recipe") {
             into 'data/naiwa/recipes'
             // 旧版配方结果读取 item 字段。十四个原始布局仍从同一套配方资源生成。

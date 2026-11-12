@@ -41,12 +41,17 @@ public final class ClientBootstrap {
         clientEvents.addListener((ViewportEvent.ComputeFogColor event) -> {
             if (NaiwaAscensionVisuals.active()) {event.setRed(.012F);event.setGreen(.016F);event.setBlue(.035F);}
         });
+        var worldView=new org.joml.Matrix4f();
         clientEvents.addListener((RenderLevelStageEvent event) -> {
             if (event.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY) NaiwaAscensionVisuals.beginWorldPass();
-            if (event.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES) NaiwaScopeTrigger.render(NaiwaForgeNetwork.CHANNEL::sendToServer);
+            if (event.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
+                // 1.20.1 AFTER_LEVEL 传入的是 GameRenderer 的投影栈；实体阶段才持有真正的相机视图，必须按帧复制。
+                worldView.set(event.getPoseStack().last().pose());
+                NaiwaScopeTrigger.render(NaiwaForgeNetwork.CHANNEL::sendToServer);
+            }
             if (event.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)
                 NaiwaAscensionVisuals.render(event.getCamera(),event.getPartialTick(),
-                        event.getPoseStack().last().pose(),event.getProjectionMatrix());
+                        worldView,event.getProjectionMatrix());
         });
         bus.addListener((RegisterShadersEvent event) -> {
             try {NaiwaAscensionVisuals.shaders((id,format,loaded) ->

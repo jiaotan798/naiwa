@@ -29,6 +29,29 @@ final class NaiwaRenderLayers {
     static final RenderType BEAM = RenderType.create("naiwa_holy_light",RenderSetup.builder(HOLY_LIGHT)
             .withTexture("Sampler0",id("textures/effect/ascension_beam.png")).sortOnUpload().createRenderSetup());
 
+    static {mapIrisPipelines();}
+
+    /** Iris 按管线对象选择光影程序；自建管线必须显式登记，继承原版 snippet 不会自动获得映射。 */
+    private static void mapIrisPipelines() {
+        try {
+            var api=Class.forName("net.irisshaders.iris.api.v0.IrisApi");
+            var program=Class.forName("net.irisshaders.iris.api.v0.IrisProgram");
+            var instance=api.getMethod("getInstance").invoke(null);
+            var assign=api.getMethod("assignPipeline",RenderPipeline.class,program);
+            assign.invoke(instance,BODY,program.getField("ENTITIES").get(null));
+            assign.invoke(instance,FLIGHT,program.getField("TEXTURED").get(null));
+            // 圣光在世界结束后独立绘制，颜色承载雨幕／光尘类型编码，必须保留自有片元程序。
+            var shadow=Class.forName("net.irisshaders.iris.api.v0.IrisShadowProgram");
+            var assignShadow=api.getMethod("assignPipelineShadow",RenderPipeline.class,shadow);
+            assignShadow.invoke(instance,BODY,shadow.getField("SHADOW_ENTITIES").get(null));
+            assignShadow.invoke(instance,FLIGHT,shadow.getField("SHADOW_ENTITIES").get(null));
+        } catch (ClassNotFoundException absent) {
+            // Iris 为可选前置；无光影实例继续使用原有着色器和管线。
+        } catch (ReflectiveOperationException error) {
+            throw new IllegalStateException("奶蛙无法登记 Iris 渲染管线",error);
+        }
+    }
+
     private NaiwaRenderLayers() {}
 
     private static Identifier id(String path) {return Identifier.fromNamespaceAndPath("naiwa",path);}

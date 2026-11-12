@@ -96,6 +96,7 @@ final class NaiwaAscensionShapes {
 
     /** 颜色字节仅编码材质种类、雨丝受光与透明度，实际金色由统一片元着色器计算。 */
     private static void vertex(VertexConsumer out,Matrix4f pose,float x,float y,float z,float u,float v,float alpha,int mode,float lit) {
-        out.vertex(pose,x,y,z).color(mode,(int)(Mth.clamp(lit,0,1)*255),0,(int)(Mth.clamp(alpha,0,1)*255)).uv(u,v).endVertex();
+        // 圣光与飞升身体使用相同的旧版 POSITION_TEX_COLOR 格式，UV 必须先于颜色写入。
+        out.vertex(pose,x,y,z).uv(u,v).color(mode,(int)(Mth.clamp(lit,0,1)*255),0,(int)(Mth.clamp(alpha,0,1)*255)).endVertex();
     }
 }

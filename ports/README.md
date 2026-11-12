@@ -22,6 +22,6 @@
 .\mod\gradlew.bat -p ports/fabric-26.1.2 build
 ```
 
-1.21.1 NeoForge 主端构建产物是 `mod/build/libs/naiwa-0.5.1.jar`。其余五端在各自的 `build/libs/` 下生成带加载器和 Minecraft 版本的 JAR。Release 下载页为方便选包，六个文件名都带加载器和 Minecraft 版本。Forge 1.20.1 的成品已内嵌 MixinExtras Forge 0.4.1。
+1.21.1 NeoForge 主端构建产物是 `mod/build/libs/naiwa-0.5.2.jar`。其余五端在各自的 `build/libs/` 下生成带加载器和 Minecraft 版本的 JAR。Release 下载页为方便选包，六个文件名都带加载器和 Minecraft 版本。Forge 1.20.1 的成品已内嵌 MixinExtras Forge 0.4.1。
 
-[0.5.1 验证](../validation/0.5.1.md) · [0.5.0 验证](../validation/0.5.0.md) · [0.4.9 历史验证](https://github.com/jiaotan798/naiwa/blob/v0.4.9/validation/0.4.9.md) · [模组设置](../docs/模组设置.md)
+[0.5.2 验证](../validation/0.5.2.md) · [0.5.0 验证](../validation/0.5.0.md) · [0.4.9 历史验证](https://github.com/jiaotan798/naiwa/blob/v0.4.9/validation/0.4.9.md) · [模组设置](../docs/模组设置.md)

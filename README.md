@@ -1,10 +1,10 @@
 # 《奶蛙》
 
-> 奶蛙爱在你挖矿、钓鱼或开门时捣乱，被发现了还会捧腹大笑。**v0.5.1** 调整脸颊与颈部模型，降低模型绘制负担，并减少 1.21.1 版同屏多只奶蛙时的顶点提交。
+> 奶蛙爱在你挖矿、钓鱼或开门时捣乱，被发现了还会捧腹大笑。**v0.5.2** 修复旧版整蛊与飞升崩溃、光影下模型不显示，以及 Forge 1.20.1 的连接超时。
 
 ## 下载与安装
 
-从 [v0.5.1 Release](https://github.com/jiaotan798/naiwa/releases/tag/v0.5.1) 下载与你的 Minecraft 版本和加载器相符的 JAR。
+从 [v0.5.2 Release](https://github.com/jiaotan798/naiwa/releases/tag/v0.5.2) 下载与你的 Minecraft 版本和加载器相符的 JAR。
 
 | Minecraft | 加载器 | 安装位置 | 前置模组 |
 | --- | --- | --- | --- |
@@ -34,7 +34,7 @@
 .\mod\gradlew.bat -p mod build
 ```
 
-主端产物为 `mod/build/libs/naiwa-0.5.1.jar`。 [六端构建说明](ports/README.md)
+主端产物为 `mod/build/libs/naiwa-0.5.2.jar`。 [六端构建说明](ports/README.md)
 
 ## 反馈
 

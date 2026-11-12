@@ -16,6 +16,7 @@
     "ForgeDamageMixin"
   ],
   "client": [
+    "ClientConnectionOrderMixin",
     "HumanoidModelMixin",
     "PlayerModelMixin",
     "LivingRendererMixin",

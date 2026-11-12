@@ -134,9 +134,10 @@ final class NaiwaModel {
                 for(int corner=0;corner<corners;corner++) {
                     int local=Math.min(corner,2),p=mesh.corners[face*3+local]*3,u=face*6+local*2;
                     consumer.vertex(positions[p],positions[p+1],positions[p+2]);
-                    if(flightReveal>=0)consumer.color(flightLight[p]/3,flightLight[p+1]/3,flightLight[p+2]/3,1);
-                    else consumer.color(255,255,255,255);
-                    consumer.uv(mesh.uv[u],mesh.uv[u+1]);
+                    if(flightReveal>=0) {
+                        // 1.20.1 按格式顺序推进写指针；飞升是位置→UV→颜色，实体则是位置→颜色→UV。
+                        consumer.uv(mesh.uv[u],mesh.uv[u+1]).color(flightLight[p]/3,flightLight[p+1]/3,flightLight[p+2]/3,1);
+                    } else consumer.color(255,255,255,255).uv(mesh.uv[u],mesh.uv[u+1]);
                     if(flightReveal<0)consumer.overlayCoords(overlay).uv2(light);
                     if(flightReveal<0)consumer.normal(normals[p],normals[p+1],normals[p+2]);
                     consumer.endVertex();

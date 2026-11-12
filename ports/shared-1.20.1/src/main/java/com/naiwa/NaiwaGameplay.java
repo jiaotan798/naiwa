@@ -96,8 +96,9 @@ public final class NaiwaGameplay {
     }
 
     /** 使用真实碰撞视线，玻璃同样遮挡；镜像光学例外由整蛊模块单独处理。 */
-    public static boolean clearLine(Level level, Vec3 from, Vec3 to) {
-        return level.clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,null)).getType()==HitResult.Type.MISS;
+    public static boolean clearLine(net.minecraft.world.entity.Entity observer, Vec3 from, Vec3 to) {
+        // 旧版 Fabric 的碰撞上下文会读取实体所在世界，不能用 null 代替射线发起者。
+        return observer.level().clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,observer)).getType()==HitResult.Type.MISS;
     }
 
     /** 仅主背包、快捷栏和副手计入携带；不遍历容器，瓶数不改变漏气频率。 */
