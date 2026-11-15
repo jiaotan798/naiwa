@@ -1,17 +1,17 @@
 {
-  "version": "0.5.1",
-  "date": "2026-11-11",
+  "version": "0.5.3",
+  "date": "2026-11-15",
   "meaning": "当前交付生产素材与可编辑源文件的识别摘要，不替代许可",
   "files": [
     {
       "path": "assets/runtime/assets/naiwa/models/entity/naiwa.nwm",
-      "bytes": 2673944,
-      "sha256": "f3b5d0fca28acda079a903a30e28eef09f2a1abdb684726d4545190ac86ebafc"
+      "bytes": 3219029,
+      "sha256": "f29b48acabe382d409f302d428752c75b6246c11f1d8d32a5ff1c172bb7220f0"
     },
     {
       "path": "assets/runtime/assets/naiwa/models/entity/naiwa_lod.nwm",
-      "bytes": 2349196,
-      "sha256": "118837245c9808b4dcaa93402b07a1a7a4eb270fbb4c3486fe7cb8939b9ebfa2"
+      "bytes": 2894265,
+      "sha256": "c717f6cc5afab7071832f631bad27ae317f15d5a9cc5cfcda4020e99fa0d30e8"
     },
     {
       "path": "assets/runtime/assets/naiwa/textures/entity/naiwa_0.png",
@@ -51,12 +51,12 @@
     {
       "path": "assets/source/nailong_face_normals.json",
       "bytes": 155148,
-      "sha256": "81b9ee809b3cc7b4a5e1de0f303529d5783662f91b61c6321927790938ed31b9"
+      "sha256": "9eeb981294bf4fe81e6e4a84800ad865567388b99c43c8a4eca40f2ea4f388d4"
     },
     {
       "path": "assets/source/nailong_origin_zero.bbmodel",
-      "bytes": 8665698,
-      "sha256": "d60718f55436410428eb801c7b031370aa8c8d6010e899cbb143c53cc10d11a2"
+      "bytes": 8713902,
+      "sha256": "e6c9d58d6edaf7b90f9598828c0b04556c3454ce0c53997c17f1cac8392aa9cc"
     },
     {
       "path": "mod/src/main/resources/assets/naiwa/sounds/laugh_full.ogg",

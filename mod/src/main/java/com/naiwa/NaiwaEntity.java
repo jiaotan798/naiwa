@@ -31,6 +31,7 @@ public final class NaiwaEntity extends PathfinderMob {
     private static final EntityDataAccessor<Integer> BOAT_STEERING = SynchedEntityData.defineId(NaiwaEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> SCOPE_VIEWER = SynchedEntityData.defineId(NaiwaEntity.class, EntityDataSerializers.INT);
     private long airborneStart = -1;
+    private final NaiwaPipaFlight pipaFlight = new NaiwaPipaFlight();
     private boolean laughSoundPlayed;
     private boolean miningRotation;
     private Player convertingPlayer;
@@ -145,6 +146,9 @@ public final class NaiwaEntity extends PathfinderMob {
     /** 转化先检查并结算，再结束演出；临时动作不会阻塞正常生物更新。 */
     @Override public void tick() {
         super.tick();
+        // 按前置的同步效果识别可选联动，不直接链接附属模组类；缺少附属时仍可独立加载。
+        pipaFlight.tick(isAlive() && getActiveEffects().stream().anyMatch(effect ->
+                effect.getEffect().value().getDescriptionId().equals("effect.shaoxinpipaqu.airborne")));
         // 静止生物的原版身体转向有延迟；矿洞演出应跟随服务器旋转，并延续到本轮大笑结束。
         // 本地标记跨过清空 ACT 的时刻，避免转身与大笑数据同批到达时又回到旧身体朝向；不写入存档。
         if(level().isClientSide) {
@@ -214,6 +218,8 @@ public final class NaiwaEntity extends PathfinderMob {
     }
 
     public NaiwaAnimations.ClipTime clip(float partialTick) {
+        var flight = pipaFlight.clip(partialTick, (level().getGameTime() + partialTick) / 20.0);
+        if (flight != null) return flight;
         if (!animation().equals("auto")) return NaiwaAnimations.resolve(animation(), Math.max(0, animationSeconds(partialTick)));
         String name = !onGround() && !isInWater() ? "jump" : getDeltaMovement().horizontalDistanceSqr() > .015 ? "run"
                 : getDeltaMovement().horizontalDistanceSqr() > .0001 ? "walk" : "idle";

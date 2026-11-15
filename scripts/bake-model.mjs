@@ -44,6 +44,12 @@ if (lodOnly || process.argv.includes('--check')) {
   process.exit(0);
 }
 const model = JSON.parse(sourceBytes);
+// 数值字符串会交给 Molang；科学计数法会把 e 解析成标识符，导致眼睑等微小位移变成大幅偏移。
+for (const clip of model.animations) for (const animator of Object.values(clip.animators))
+  for (const key of animator.keyframes ?? []) for (const point of key.data_points)
+    for (const axis of ['x', 'y', 'z'])
+      assert.ok(!/^[+-]?(?:\d+\.?\d*|\.\d+)[eE][+-]?\d+$/.test(String(point[axis])),
+        `${clip.name}/${animator.name}/${axis} 必须使用普通小数，不能使用科学计数法`);
 const bones = model.elements.filter(e => e.type === 'armature_bone');
 const meshes = model.elements.filter(e => e.type === 'mesh');
 assert.equal(meshes.length, 1, '当前接入资产必须为一张带权重网格');

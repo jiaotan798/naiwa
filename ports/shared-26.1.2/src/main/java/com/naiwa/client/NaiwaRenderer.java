@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.naiwa.NaiwaAnimations;
 import com.naiwa.NaiwaEntity;
+import com.naiwa.NaiwaPipaFlight;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -49,9 +50,11 @@ public final class NaiwaRenderer extends EntityRenderer<NaiwaEntity,NaiwaRendere
     @Override public void extractRenderState(NaiwaEntity entity,State state,float partial) {
         super.extractRenderState(entity,state,partial);
         state.clip = entity.clip(partial);
-        state.action = entity.act();
-        state.crouched = entity.isShiftKeyDown();
-        state.holdingBook = entity.getMainHandItem().is(Items.ENCHANTED_BOOK);
+        // 在状态提取阶段固定飞行姿态，延迟渲染和光影轮次不再读取会变化的实体状态。
+        boolean flying=state.clip.name().startsWith("pipa_");
+        state.action = flying?"":entity.act();
+        state.crouched = !flying&&entity.isShiftKeyDown();
+        state.holdingBook = !flying&&entity.getMainHandItem().is(Items.ENCHANTED_BOOK);
         // 延迟提交时可能正在绘制阴影；先按主镜头确定精度，箱沿切面和手掌道具锚点固定使用高模。
         var client = Minecraft.getInstance();
         var camera = client.gameRenderer.getMainCamera();
@@ -72,7 +75,7 @@ public final class NaiwaRenderer extends EntityRenderer<NaiwaEntity,NaiwaRendere
     @Override public void submit(State state,PoseStack pose,SubmitNodeCollector collector,CameraRenderState camera) {
         if (!state.isInvisible) {
             pose.pushPose();
-            pose.mulPose(Axis.YP.rotationDegrees(-state.bodyYaw));
+            pose.mulPose(Axis.YP.rotationDegrees(-state.bodyYaw + NaiwaPipaFlight.headingOffset(state.clip)));
             if (state.crouched) pose.scale(1,.8F,1);
             boolean chest = state.action.equals("chest_peek");
             if (chest) {

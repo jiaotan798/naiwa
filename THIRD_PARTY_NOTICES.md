@@ -8,7 +8,7 @@
 
 | 内容 | 文件与用途 |
 | --- | --- |
-| 可编辑模型和修形法线 | [模型源文件](assets/source/README.md)随源码提供。38 根骨骼、六张贴图和 11 段动画用于生成游戏资源。 |
+| 可编辑模型和修形法线 | [模型源文件](assets/source/README.md)随源码提供。40 根骨骼、六张贴图和 13 段动画用于生成游戏资源。 |
 | 游戏模型和实体贴图 | `assets/runtime/` 中的高模、低模和贴图进入成品。模型摘要和姿态对照供构建校验使用。 |
 | 盾牌源图 | [naiwa-shield-v1.png](assets/shield/naiwa-shield-v1.png)用于维护盾面和把手的贴图。 |
 | 物品与状态图标 | 由 `scripts/make-icons.mjs` 中的像素稿生成。 |

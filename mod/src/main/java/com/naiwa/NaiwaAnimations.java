@@ -4,8 +4,8 @@ import java.util.List;
 
 /** 动画名称及时长来自随附原模型；纯数据可供专服、客户端和结构检查共同使用。 */
 public final class NaiwaAnimations {
-    public static final List<String> NAMES = List.of("idle", "walk", "run", "jump", "wave", "laugh_enter", "laugh", "laugh_exit", "ascend_enter", "ascend_hover", "ascend_exit");
-    private static final double[] LENGTHS = {2.4, 1.2, .8, 1.6, 2.4, .6, 8.25, .8, .6, 3.04, .6};
+    public static final List<String> NAMES = List.of("idle", "walk", "run", "jump", "wave", "laugh_enter", "laugh", "laugh_exit", "ascend_enter", "ascend_hover", "ascend_exit", "pipa_enter", "pipa_flight");
+    private static final double[] LENGTHS = {2.4, 1.2, .8, 1.6, 2.4, .6, 8.25, .8, .6, 3.04, .6, .5, 4};
     private NaiwaAnimations() {}
 
     /** 返回源模型片段时长，完整大笑则返回三段之和，单位为秒。 */
@@ -18,7 +18,7 @@ public final class NaiwaAnimations {
     }
 
     public static boolean loops(String name) {
-        return name.equals("idle") || name.equals("walk") || name.equals("run") || name.equals("ascend_hover");
+        return name.equals("idle") || name.equals("walk") || name.equals("run") || name.equals("ascend_hover") || name.equals("pipa_flight");
     }
 
     /** 普通交互串起入场、大笑和恢复；显式播放单段时仍保留原片段时长。 */

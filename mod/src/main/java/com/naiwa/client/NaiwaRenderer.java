@@ -1,6 +1,7 @@
 package com.naiwa.client;
 
 import com.naiwa.NaiwaEntity;
+import com.naiwa.NaiwaPipaFlight;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
@@ -44,13 +45,16 @@ public final class NaiwaRenderer extends EntityRenderer<NaiwaEntity> {
 
     @Override public void render(NaiwaEntity entity, float yaw, float partialTick, PoseStack pose, MultiBufferSource buffers, int light) {
         var clip = entity.clip(partialTick);
-        boolean holdingBook=entity.getMainHandItem().is(Items.ENCHANTED_BOOK);
+        boolean flying=clip.name().startsWith("pipa_");
+        String action=flying?"":entity.act();
+        boolean holdingBook=!flying&&entity.getMainHandItem().is(Items.ENCHANTED_BOOK);
         pose.pushPose();
         // 原模型朝 +Z、16 编辑单位为 1 格，不沿用原版方块生物的倒置 Y 轴。
-        pose.mulPose(Axis.YP.rotationDegrees(-Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)));
-        if(entity.isShiftKeyDown()) pose.scale(1,.8F,1);
-        shadowRadius=entity.act().equals("chest_peek")?0:.45F;
-        if(entity.act().equals("chest_peek")) {
+        pose.mulPose(Axis.YP.rotationDegrees(-Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot) + NaiwaPipaFlight.headingOffset(clip)));
+        if(!flying&&entity.isShiftKeyDown()) pose.scale(1,.8F,1);
+        // 飞行动作独占本体姿态；道具及整蛊叠加层暂停显示，落地后仍读取原有演出状态。
+        shadowRadius=action.equals("chest_peek")?0:.45F;
+        if(action.equals("chest_peek")) {
             // 实体脚部在闭合箱体顶面；渲染降到开盖后的箱沿，只有现有头部从箱内露出。
             pose.pushPose();pose.translate(0,-.25,0);pose.scale(.9F,.9F,.9F);
             model.drawChestHead(clip.name(),clip.seconds(),pose,buffers,light,OverlayTexture.pack(0,entity.hurtTime>0||entity.deathTime>0),entity.act(),entity.getXRot(),holdingBook);pose.popPose();
@@ -58,9 +62,9 @@ public final class NaiwaRenderer extends EntityRenderer<NaiwaEntity> {
             // 阴影只需要轮廓，复用低模可少提交一轮高模顶点。持书仍走原手掌定位。
             boolean low = usesSimplified(entity) || !holdingBook && NaiwaShadowPass.active();
             var body = low ? simplified : model;
-            body.drawAct(clip.name(),clip.seconds(),pose,buffers,light,OverlayTexture.pack(0,entity.hurtTime>0||entity.deathTime>0),entity.act(),entity.getXRot(),holdingBook);
+            body.drawAct(clip.name(),clip.seconds(),pose,buffers,light,OverlayTexture.pack(0,entity.hurtTime>0||entity.deathTime>0),action,entity.getXRot(),holdingBook);
         }
-        if(entity.act().startsWith("mine")) {
+        if(action.startsWith("mine")) {
             pose.pushPose();
             boolean hidden=entity.act().equals("mine_hide");
             pose.translate(-.45,1.15,hidden?-.5:.65);

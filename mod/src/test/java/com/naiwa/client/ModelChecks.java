@@ -12,13 +12,14 @@ import javax.imageio.ImageIO;
 /** 与原生编辑器实际蒙皮对照，并检查单次/循环播放和损坏资源；不代替游戏截图。 */
 public final class ModelChecks {
     public static void main(String[] args) throws Exception {
+        pipaFlightChecks();
         faceCullingChecks();
         totemCameraChecks();
         AscensionVisualChecks.check();
         GasParticleChecks.check();
         byte[] bytes = Files.readAllBytes(Path.of("../assets/runtime/assets/naiwa/models/entity/naiwa.nwm"));
         var model = new NaiwaMesh(new ByteArrayInputStream(bytes));
-        assert model.vertexCount == 4685 && model.boneCount == 38 && model.faceCount == 9207 && model.materialCount == 6;
+        assert model.vertexCount == 4685 && model.boneCount == 40 && model.faceCount == 9207 && model.materialCount == 6;
         var referenced=new boolean[model.vertexCount];for(int vertex:model.corners)referenced[vertex]=true;
         int unused=0;for(boolean used:referenced)if(!used)unused++;
         assert unused==31 : "精修模型的无面顶点须保留，不能重排原生姿态对照的顶点索引";
@@ -62,6 +63,7 @@ public final class ModelChecks {
             assert distance(positions, other) < .0001 : "单次/循环动画末端处理不符：" + clip.name();
         }
         var checks = JsonParser.parseString(Files.readString(Path.of("../assets/runtime/native-pose-checks.json"))).getAsJsonObject();
+        pipaPoseChecks(model);
         fingerActionChecks(model);
         for(String action:new String[]{"mirror","door_giggle","tree","tree_exposed","mine","mine_hide","fish","fish_land","boat","creeper_wait","scratch","diamond_point","diamond_caught","chest_peek","scope_close"}) {
             model.poseAction("idle",.5,positions,normals,action,30);
@@ -96,7 +98,51 @@ public final class ModelChecks {
         byte[] corrupt = bytes.clone(); corrupt[8] = 127;
         rejects(corrupt); rejects(Arrays.copyOf(bytes, 40));
         shieldSkin();
-        System.out.println("11 段动画、33 组原生姿态对照、播放边界和损坏资源检查通过；最大蒙皮误差 BB 单位：" + largest);
+        System.out.println(model.clips.size()+" 段动画、原生姿态对照、播放边界和损坏资源检查通过；最大蒙皮误差 BB 单位：" + largest);
+    }
+
+    /** 覆盖半途取消、反向恢复、完整循环与重复标记；无联动时必须让原动画正常播放。 */
+    private static void pipaFlightChecks() {
+        // 用侧躺头部轴 -X 验证四个移动方向，避免把 90° 修正写成脚先行的反方向。
+        var flight = new NaiwaAnimations.ClipTime("pipa_flight", 0);
+        for (double yaw : new double[]{0, 90, 180, 270}) {
+            double angle=Math.toRadians(-yaw+com.naiwa.NaiwaPipaFlight.headingOffset(flight));
+            assert Math.abs(-Math.cos(angle)+Math.sin(Math.toRadians(yaw)))<1E-6;
+            assert Math.abs(Math.sin(angle)-Math.cos(Math.toRadians(yaw)))<1E-6;
+        }
+        assert com.naiwa.NaiwaPipaFlight.headingOffset(new NaiwaAnimations.ClipTime("idle", 1))==0;
+        assert com.naiwa.NaiwaPipaFlight.headingOffset(new NaiwaAnimations.ClipTime("pipa_enter", 0))==0;
+        assert com.naiwa.NaiwaPipaFlight.headingOffset(new NaiwaAnimations.ClipTime("pipa_enter", .25))==45;
+        assert com.naiwa.NaiwaPipaFlight.headingOffset(new NaiwaAnimations.ClipTime("pipa_enter", .5))==90;
+        var state=new com.naiwa.NaiwaPipaFlight();
+        assert state.clip(1,0)==null;
+        for(int i=0;i<5;i++)state.tick(true);
+        assert state.clip(1,0).name().equals("pipa_enter");
+        assert state.clip(1,0).seconds()==.25;
+        state.tick(false);
+        assert state.clip(0,0).seconds()==.25;
+        assert state.clip(1,0).seconds()==.2;
+        for(int i=0;i<20;i++)state.tick(true);
+        assert state.clip(.5F,12).name().equals("pipa_flight");
+        for(int i=0;i<10;i++)state.tick(false);
+        assert state.clip(1,12)==null;
+        state.tick(false);
+        assert state.clip(0,12)==null;
+        System.out.println("琵琶曲起飞、半途取消、循环及恢复检查通过");
+    }
+
+    /** 用实际采样顶点检查片段接缝及起落缓动，避免源动画改动造成切换跳帧。 */
+    private static void pipaPoseChecks(NaiwaMesh model) {
+        float[] a=new float[model.vertexCount*3],b=a.clone(),normals=a.clone();
+        model.pose("pipa_enter",.5,a,normals);model.pose("pipa_flight",0,b,normals);
+        assert distance(a,b)<.0001 : "侧躺过渡末帧须与循环首帧一致";
+        model.pose("pipa_enter",0,a,normals);model.pose("pipa_enter",.02,b,normals);
+        double start=distance(a,b);
+        model.pose("pipa_enter",.24,a,normals);model.pose("pipa_enter",.26,b,normals);
+        double middle=distance(a,b);
+        model.pose("pipa_enter",.48,a,normals);model.pose("pipa_enter",.5,b,normals);
+        assert start<middle&&distance(a,b)<middle : "侧躺起落两端须比中段更慢";
+        System.out.println("侧躺动作接缝及起落缓动检查通过");
     }
 
     /** 用优化前的逐顶点算法作独立基准，逐元素检查位置与法线，不只检查有限数或少量特征点。 */
@@ -128,7 +174,7 @@ public final class ModelChecks {
         System.out.println("头部路径 "+model.headVertices.length+"/"+model.vertexCount+" 顶点，"+cases+" 组位置、法线及未使用顶点检查通过");
     }
 
-    /** 固定保留第二批优化前的运算顺序与骨号规则，不能改成调用预计算数组，否则失去对照意义。 */
+    /** 保留逐顶点算法的运算顺序，骨号分区同步当前源模型，不能改成调用预计算数组，否则失去对照意义。 */
     private static void legacyAction(NaiwaMesh model,double seconds,float[] target,float[] normals,String action,float pitch) {
         if(action.isEmpty())return;
         for(int v=0;v<model.vertexCount;v++) {
@@ -138,7 +184,8 @@ public final class ModelChecks {
                 if(bone>=17&&bone<=18||bone==19||bone==36)left+=weight;
                 if(bone>=21&&bone<=22||bone==23||bone==37)right+=weight;
                 if(bone>=26&&bone<=35)legs+=weight;
-                if(bone>=4&&bone<=15)head+=weight;
+                // 38/39 为随头部俯仰的上下唇嘴角控制，仍按原顺序逐项累加。
+                if(bone>=4&&bone<=15||bone==38||bone==39)head+=weight;
             }
             float arms=switch(action) {
                 case "tree","tree_exposed","fish" -> -1.2F;
